@@ -1,0 +1,12 @@
+# Flatfox Python worker — runtime dependencies.
+# Install into a venv:  python -m venv .venv && .venv/Scripts/activate && pip install -r requirements.txt
+
+requests>=2.32,<3
+python-dotenv>=1.0,<2
+anthropic>=0.39,<1
+SQLAlchemy>=2.0,<3
+psycopg[binary]>=3.2,<4
+APScheduler>=3.10,<4
+redis>=5.0,<6
+
+# Dev (optional): pip install ruff pytest

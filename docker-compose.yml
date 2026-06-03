@@ -1,0 +1,45 @@
+# Local dev infrastructure: Postgres (with earthdistance for radius search) + Redis.
+# Usage:
+#   docker compose up -d
+#   docker compose down          # stop
+#   docker compose down -v       # stop + wipe data
+#
+# App and worker run on the host and connect via DATABASE_URL / REDIS_URL in .env.
+
+services:
+  postgres:
+    image: postgres:16
+    container_name: flatfox_postgres
+    restart: unless-stopped
+    environment:
+      POSTGRES_USER: flatfox
+      POSTGRES_PASSWORD: flatfox
+      POSTGRES_DB: flatfox
+    ports:
+      - "5432:5432"
+    volumes:
+      - pgdata:/var/lib/postgresql/data
+      - ./shared/init:/docker-entrypoint-initdb.d:ro
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U flatfox -d flatfox"]
+      interval: 5s
+      timeout: 5s
+      retries: 10
+
+  redis:
+    image: redis:7-alpine
+    container_name: flatfox_redis
+    restart: unless-stopped
+    ports:
+      - "6379:6379"
+    volumes:
+      - redisdata:/data
+    healthcheck:
+      test: ["CMD", "redis-cli", "ping"]
+      interval: 5s
+      timeout: 5s
+      retries: 10
+
+volumes:
+  pgdata:
+  redisdata:

@@ -9,8 +9,11 @@ class Settings(BaseSettings):
     match_score_threshold: float = 0.5
     flatfox_base_url: str = "https://flatfox.ch"
     flatfox_expand: str = "images,documents,attributes"
+    flatfox_page_size: int = 100
+    flatfox_page_delay: float = 0.5
+    flatfox_max_retries: int = 3
 
-    model_config = {"env_file": "../.env", "env_file_encoding": "utf-8"}
+    model_config = {"env_file": "../.env", "env_file_encoding": "utf-8", "extra": "ignore"}
 
 
 settings = Settings()

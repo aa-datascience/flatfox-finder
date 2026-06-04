@@ -1,11 +1,12 @@
 import { getServerSession } from "next-auth";
 import { NextResponse } from "next/server";
 
+import { authOptions } from "@/lib/auth-options";
+
 export async function getSessionUserId(): Promise<string | null> {
-  const session = await getServerSession();
-  if (!session?.user?.email) return null;
-  // Will be replaced with proper user ID lookup in task 8
-  return null;
+  const session = await getServerSession(authOptions);
+  const user = session?.user as { id?: string } | undefined;
+  return user?.id ?? null;
 }
 
 export function unauthorized() {

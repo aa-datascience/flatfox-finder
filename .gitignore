@@ -16,6 +16,7 @@ build/
 # Next.js
 app/.next/
 app/out/
+app/tsconfig.tsbuildinfo
 
 # Prisma
 app/prisma/migrations/migration_lock.toml

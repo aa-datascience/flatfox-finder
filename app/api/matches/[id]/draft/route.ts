@@ -1,6 +1,7 @@
 import Anthropic from "@anthropic-ai/sdk";
 import { NextRequest, NextResponse } from "next/server";
 
+import { getSessionUserId, unauthorized, forbidden } from "@/lib/auth";
 import { prisma } from "@/lib/db";
 import { stripPii } from "@/lib/pii";
 import {
@@ -15,11 +16,11 @@ export async function POST(
   _request: NextRequest,
   { params }: { params: Promise<{ id: string }> }
 ) {
+  const userId = await getSessionUserId();
+  if (!userId) return unauthorized();
+
   const { id: matchId } = await params;
 
-  // Auth: get session user
-  // TODO task 8: replace with proper NextAuth session check
-  // For now, load the match and trust the caller
   const match = await prisma.match.findUnique({
     where: { id: matchId },
     include: {
@@ -33,6 +34,8 @@ export async function POST(
   if (!match) {
     return NextResponse.json({ error: "Match not found" }, { status: 404 });
   }
+
+  if (match.userId !== userId) return forbidden();
 
   if (!match.listing) {
     return NextResponse.json(

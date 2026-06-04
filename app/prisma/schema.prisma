@@ -6,3 +6,132 @@ datasource db {
   provider = "postgresql"
   url      = env("DATABASE_URL")
 }
+
+model User {
+  id            String        @id @default(uuid()) @db.Uuid
+  email         String        @unique
+  passwordHash  String        @map("password_hash")
+  name          String
+  locale        String        @default("en") @db.VarChar(5)
+  consentFlags  Json          @default("{}") @map("consent_flags")
+  plan          String        @default("free") @db.VarChar(20)
+  createdAt     DateTime      @default(now()) @map("created_at")
+  profile       UserProfile?
+  matches       Match[]
+  messages      Message[]
+
+  @@map("users")
+}
+
+model UserProfile {
+  id              String    @id @default(uuid()) @db.Uuid
+  userId          String    @unique @map("user_id") @db.Uuid
+  user            User      @relation(fields: [userId], references: [id], onDelete: Cascade)
+  inputMode       String    @default("form") @map("input_mode") @db.VarChar(10)
+  rawText         String?   @map("raw_text")
+  studyProgram    String?   @map("study_program")
+  budgetMax       Int?      @map("budget_max")
+  roomsMin        Float?    @map("rooms_min")
+  cities          String[]  @default([])
+  radiusKm        Int       @default(10) @map("radius_km")
+  moveInFrom      DateTime? @map("move_in_from") @db.Date
+  moveInFlexible  Boolean   @default(true) @map("move_in_flexible")
+  furnishedPref   Boolean?  @map("furnished_pref")
+  languages       String[]  @default([])
+  vibe            String?   @db.VarChar(10)
+  maxFlatmates    Int?      @map("max_flatmates")
+  petsOk          Boolean?  @map("pets_ok")
+  smokingOk       Boolean?  @map("smoking_ok")
+  genderPref      String?   @map("gender_pref") @db.VarChar(15)
+  updatedAt       DateTime  @updatedAt @map("updated_at")
+
+  @@map("user_profiles")
+}
+
+model Listing {
+  id              Int                @id @map("id")
+  slug            String
+  url             String
+  status          String             @default("active") @db.VarChar(20)
+  offerType       String             @map("offer_type") @db.VarChar(20)
+  objectCategory  String             @map("object_category") @db.VarChar(20)
+  objectType      String?            @map("object_type") @db.VarChar(30)
+  rentNet         Float?             @map("rent_net")
+  rentCharges     Float?             @map("rent_charges")
+  rentGross       Float?             @map("rent_gross")
+  surfaceLiving   Float?             @map("surface_living")
+  numberOfRooms   Float?             @map("number_of_rooms")
+  floor           Int?
+  isFurnished     Boolean?           @map("is_furnished")
+  isTemporary     Boolean?           @map("is_temporary")
+  movingDate      DateTime?          @map("moving_date") @db.Date
+  movingDateType  String?            @map("moving_date_type") @db.VarChar(20)
+  zipcode         String?            @db.VarChar(10)
+  city            String?            @db.VarChar(100)
+  lat             Float?
+  lng             Float?
+  description     String?
+  shortTitle      String?            @map("short_title")
+  publicTitle     String?            @map("public_title")
+  published       DateTime?
+  reserved        Boolean            @default(false)
+  fetchedAt       DateTime           @default(now()) @map("fetched_at")
+  removedAt       DateTime?          @map("removed_at")
+  attributes      ListingAttribute?
+  matches         Match[]
+
+  @@index([city, rentGross, numberOfRooms])
+  @@index([status, published])
+  @@map("listings")
+}
+
+model ListingAttribute {
+  listingId       Int       @id @map("listing_id")
+  listing         Listing   @relation(fields: [listingId], references: [id], onDelete: Cascade)
+  flatmateCount   Int?      @map("flatmate_count")
+  languages       String[]  @default([])
+  vibe            String?   @db.VarChar(10)
+  pets            Boolean?
+  smoking         Boolean?
+  genderPref      String?   @map("gender_pref") @db.VarChar(15)
+  moveInFlexible  Boolean?  @map("move_in_flexible")
+  extractionModel String?   @map("extraction_model") @db.VarChar(50)
+  extractedAt     DateTime  @default(now()) @map("extracted_at")
+
+  @@map("listing_attributes")
+}
+
+model Match {
+  id               String    @id @default(uuid()) @db.Uuid
+  userId           String    @map("user_id") @db.Uuid
+  user             User      @relation(fields: [userId], references: [id], onDelete: Cascade)
+  listingId        Int?      @map("listing_id")
+  listing          Listing?  @relation(fields: [listingId], references: [id], onDelete: SetNull)
+  score            Float
+  scoreBreakdown   Json      @default("{}") @map("score_breakdown")
+  rationale        String?
+  status           String    @default("new") @db.VarChar(20)
+  listingSnapshot  Json      @default("{}") @map("listing_snapshot")
+  createdAt        DateTime  @default(now()) @map("created_at")
+  messages         Message[]
+
+  @@unique([userId, listingId])
+  @@index([userId, status])
+  @@index([score])
+  @@map("matches")
+}
+
+model Message {
+  id        String    @id @default(uuid()) @db.Uuid
+  matchId   String    @map("match_id") @db.Uuid
+  match     Match     @relation(fields: [matchId], references: [id], onDelete: Cascade)
+  userId    String    @map("user_id") @db.Uuid
+  user      User      @relation(fields: [userId], references: [id], onDelete: Cascade)
+  body      String
+  language  String    @db.VarChar(5)
+  mode      String    @default("review") @db.VarChar(10)
+  status    String    @default("draft") @db.VarChar(10)
+  sentAt    DateTime? @map("sent_at")
+
+  @@map("messages")
+}

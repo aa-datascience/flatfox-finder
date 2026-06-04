@@ -18,7 +18,7 @@ app/.next/
 app/out/
 
 # Prisma
-app/prisma/migrations/
+app/prisma/migrations/migration_lock.toml
 
 # Python venv
 worker/venv/

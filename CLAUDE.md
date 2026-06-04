@@ -62,6 +62,31 @@ CLAUDE.md     → this file
 - Filter ingestion: only RENT + APARTMENT/SHARED/HOUSE (skip parking/commercial).
 - PII anonymization: NEVER send real user names, emails, or phone numbers to the Claude API. Strip PII before all API calls. For message generation, use placeholders ({STUDENT_NAME} etc.) and substitute after the response. See BUILD-SPEC.md §6.
 
+## Build Progress
+
+Tasks 1–8 are **done and committed**. Resume from task 9.
+
+| # | Task | Status | Key files |
+|---|------|--------|-----------|
+| 1 | Scaffold | ✅ | monorepo structure, docker-compose, package.json, pyproject.toml |
+| 2 | DB migrations | ✅ | `app/prisma/schema.prisma` (6 tables), `shared/migrations/` |
+| 3 | Flatfox client | ✅ | `worker/src/flatfox_worker/flatfox_client.py` — pagination, filtering, retry |
+| 4 | Ingestion job | ✅ | `worker/src/flatfox_worker/ingestion.py` — upsert, flag removed |
+| 5 | Listing extractor | ✅ | `worker/src/flatfox_worker/extractor.py`, `worker/prompts/extract_listing.txt`, `pii.py` |
+| 6 | Matching engine | ✅ | `worker/src/flatfox_worker/matcher.py` — two-layer scoring, 35 tests |
+| 7 | Message drafter | ✅ | `app/api/matches/[id]/draft/route.ts`, `app/lib/prompts/draft_message.ts`, `app/lib/pii.ts` |
+| 8 | Auth | ✅ | `app/lib/auth-options.ts`, `app/api/auth/signup/route.ts`, `app/api/auth/[...nextauth]/route.ts` |
+| 9 | Onboarding | 🔲 | |
+| 10 | Dashboard | 🔲 | |
+| 11 | Match detail | 🔲 | |
+| 12 | Settings | 🔲 | |
+| 13 | Email digest | 🔲 | |
+| 14 | Compliance | 🔲 | |
+| 15 | PII + security | 🔲 | |
+
+**Test suite:** `cd worker && pytest` → 74 tests all passing.
+**Type check:** `cd app && npx tsc --noEmit` → 0 errors.
+
 ## Current Tasks
 See BUILD-SPEC.md §8 for the full task list. Work through tasks in order (1→15).
 Each task = a working, testable increment. Commit after each.

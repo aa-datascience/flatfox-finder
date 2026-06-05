@@ -64,7 +64,7 @@ CLAUDE.md     → this file
 
 ## Build Progress
 
-Tasks 1–8 are **done and committed**. Resume from task 9.
+Tasks 1–9 are **done and committed**. Resume from task 10.
 
 | # | Task | Status | Key files |
 |---|------|--------|-----------|
@@ -76,7 +76,7 @@ Tasks 1–8 are **done and committed**. Resume from task 9.
 | 6 | Matching engine | ✅ | `worker/src/flatfox_worker/matcher.py` — two-layer scoring, 35 tests |
 | 7 | Message drafter | ✅ | `app/api/matches/[id]/draft/route.ts`, `app/lib/prompts/draft_message.ts`, `app/lib/pii.ts` |
 | 8 | Auth | ✅ | `app/lib/auth-options.ts`, `app/api/auth/signup/route.ts`, `app/api/auth/[...nextauth]/route.ts` |
-| 9 | Onboarding | 🔲 | |
+| 9 | Onboarding | ✅ | `app/app/onboarding/page.tsx`, `app/api/profile/route.ts`, `app/api/profile/parse/route.ts`, `app/lib/prompts/parse_profile.ts`, `app/middleware.ts` |
 | 10 | Dashboard | 🔲 | |
 | 11 | Match detail | 🔲 | |
 | 12 | Settings | 🔲 | |

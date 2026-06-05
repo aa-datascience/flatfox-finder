@@ -64,7 +64,7 @@ CLAUDE.md     → this file
 
 ## Build Progress
 
-Tasks 1–11 are **done and committed**. Resume from task 12.
+Tasks 1–12 are **done and committed**. Resume from task 13.
 
 | # | Task | Status | Key files |
 |---|------|--------|-----------|
@@ -79,7 +79,7 @@ Tasks 1–11 are **done and committed**. Resume from task 12.
 | 9 | Onboarding | ✅ | `app/app/onboarding/page.tsx`, `app/api/profile/route.ts`, `app/api/profile/parse/route.ts`, `app/lib/prompts/parse_profile.ts`, `app/middleware.ts` |
 | 10 | Dashboard | ✅ | `app/app/dashboard/page.tsx`, `app/api/matches/route.ts`, `app/api/matches/[id]/route.ts` |
 | 11 | Match detail | ✅ | `app/app/match/[id]/page.tsx`, `app/api/matches/[id]/route.ts` (GET), `app/api/matches/[id]/message/route.ts` |
-| 12 | Settings | 🔲 | |
+| 12 | Settings | ✅ | `app/app/settings/page.tsx`, `app/api/settings/password/route.ts`, `app/api/account/route.ts` |
 | 13 | Email digest | 🔲 | |
 | 14 | Compliance | 🔲 | |
 | 15 | PII + security | 🔲 | |

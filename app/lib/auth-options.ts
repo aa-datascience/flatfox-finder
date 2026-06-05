@@ -3,6 +3,7 @@ import type { NextAuthOptions } from "next-auth";
 import CredentialsProvider from "next-auth/providers/credentials";
 
 import { prisma } from "@/lib/db";
+import { clearAttempts, isRateLimited, recordFailedAttempt } from "@/lib/rate-limit";
 
 export const authOptions: NextAuthOptions = {
   providers: [
@@ -15,14 +16,24 @@ export const authOptions: NextAuthOptions = {
       async authorize(credentials) {
         if (!credentials?.email || !credentials?.password) return null;
 
+        const key = `login:${credentials.email.toLowerCase()}`;
+        if (isRateLimited(key)) return null;
+
         const user = await prisma.user.findUnique({
           where: { email: credentials.email },
         });
-        if (!user) return null;
+        if (!user) {
+          recordFailedAttempt(key);
+          return null;
+        }
 
         const valid = await compare(credentials.password, user.passwordHash);
-        if (!valid) return null;
+        if (!valid) {
+          recordFailedAttempt(key);
+          return null;
+        }
 
+        clearAttempts(key);
         return {
           id: user.id,
           email: user.email,

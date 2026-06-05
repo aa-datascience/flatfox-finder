@@ -64,7 +64,7 @@ CLAUDE.md     → this file
 
 ## Build Progress
 
-Tasks 1–14 are **done and committed**. Resume from task 15.
+All 15 tasks are **done and committed**.
 
 | # | Task | Status | Key files |
 |---|------|--------|-----------|
@@ -82,7 +82,7 @@ Tasks 1–14 are **done and committed**. Resume from task 15.
 | 12 | Settings | ✅ | `app/app/settings/page.tsx`, `app/api/settings/password/route.ts`, `app/api/account/route.ts` |
 | 13 | Email digest | ✅ | `worker/src/flatfox_worker/email_digest.py`, `worker/tests/test_email_digest.py` |
 | 14 | Compliance | ✅ | `app/app/privacy/page.tsx`, `worker/src/flatfox_worker/purge.py`, `worker/tests/test_purge.py` |
-| 15 | PII + security | 🔲 | |
+| 15 | PII + security | ✅ | `app/lib/rate-limit.ts`, `app/lib/auth-options.ts` (rate limiting), `.github/workflows/ci.yml` |
 
 **Test suite:** `cd worker && pytest` → 86 tests all passing.
 **Type check:** `cd app && npx tsc --noEmit` → 0 errors.

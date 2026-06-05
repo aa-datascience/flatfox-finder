@@ -3,6 +3,7 @@
 import logging
 
 from flatfox_worker.config import settings
+from flatfox_worker.email_digest import run_email_digest
 from flatfox_worker.flatfox_client import FlatfoxClient
 from flatfox_worker.extractor import run_extraction
 from flatfox_worker.ingestion import run_ingestion
@@ -30,6 +31,10 @@ def run_pipeline() -> None:
 
     matched = run_matching()
     logger.info("Matching: %d new matches.", matched)
+
+    if matched > 0:
+        sent = run_email_digest()
+        logger.info("Email digest: %d emails sent.", sent)
 
 
 if __name__ == "__main__":

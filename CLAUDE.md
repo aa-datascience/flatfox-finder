@@ -64,7 +64,7 @@ CLAUDE.md     → this file
 
 ## Build Progress
 
-Tasks 1–12 are **done and committed**. Resume from task 13.
+Tasks 1–13 are **done and committed**. Resume from task 14.
 
 | # | Task | Status | Key files |
 |---|------|--------|-----------|
@@ -80,11 +80,11 @@ Tasks 1–12 are **done and committed**. Resume from task 13.
 | 10 | Dashboard | ✅ | `app/app/dashboard/page.tsx`, `app/api/matches/route.ts`, `app/api/matches/[id]/route.ts` |
 | 11 | Match detail | ✅ | `app/app/match/[id]/page.tsx`, `app/api/matches/[id]/route.ts` (GET), `app/api/matches/[id]/message/route.ts` |
 | 12 | Settings | ✅ | `app/app/settings/page.tsx`, `app/api/settings/password/route.ts`, `app/api/account/route.ts` |
-| 13 | Email digest | 🔲 | |
+| 13 | Email digest | ✅ | `worker/src/flatfox_worker/email_digest.py`, `worker/tests/test_email_digest.py` |
 | 14 | Compliance | 🔲 | |
 | 15 | PII + security | 🔲 | |
 
-**Test suite:** `cd worker && pytest` → 74 tests all passing.
+**Test suite:** `cd worker && pytest` → 82 tests all passing.
 **Type check:** `cd app && npx tsc --noEmit` → 0 errors.
 
 ## Current Tasks

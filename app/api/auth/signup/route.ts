@@ -49,6 +49,11 @@ export async function POST(request: NextRequest) {
       passwordHash,
       name,
       locale: userLocale,
+      consentFlags: {
+        accepted_terms: true,
+        accepted_privacy: true,
+        consent_at: new Date().toISOString(),
+      },
     },
   });
 

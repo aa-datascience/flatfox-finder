@@ -136,8 +136,10 @@ export default function SignupPage() {
               id="consent"
             />
             <label htmlFor="consent" className="text-sm text-gray-600">
-              I agree to the processing of my data as described in the privacy
-              policy.
+              I agree to the processing of my data as described in the{" "}
+              <a href="/privacy" target="_blank" className="text-blue-600 hover:underline">
+                privacy policy
+              </a>.
             </label>
           </div>
 

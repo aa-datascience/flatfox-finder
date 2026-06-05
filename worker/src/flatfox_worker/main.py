@@ -8,6 +8,7 @@ from flatfox_worker.flatfox_client import FlatfoxClient
 from flatfox_worker.extractor import run_extraction
 from flatfox_worker.ingestion import run_ingestion
 from flatfox_worker.matcher import run_matching
+from flatfox_worker.purge import run_purge
 
 logging.basicConfig(
     level=logging.INFO,
@@ -35,6 +36,9 @@ def run_pipeline() -> None:
     if matched > 0:
         sent = run_email_digest()
         logger.info("Email digest: %d emails sent.", sent)
+
+    purged = run_purge()
+    logger.info("Purge: %d stale listings removed.", purged)
 
 
 if __name__ == "__main__":

@@ -60,7 +60,7 @@ def _normalize(raw: dict[str, Any]) -> NormalizedListing | None:
         pk=raw["pk"],
         slug=raw.get("slug", ""),
         url=raw.get("url", ""),
-        status=raw.get("status", "active"),
+        status="active",  # normalise — all listings that pass filter are active
         offer_type=offer_type,
         object_category=object_category,
         object_type=raw.get("object_type"),

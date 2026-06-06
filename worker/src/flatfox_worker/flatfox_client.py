@@ -74,7 +74,7 @@ def _normalize(raw: dict[str, Any]) -> NormalizedListing | None:
         is_temporary=raw.get("is_temporary"),
         moving_date=raw.get("moving_date"),
         moving_date_type=raw.get("moving_date_type"),
-        zipcode=raw.get("zipcode"),
+        zipcode=str(raw["zipcode"]) if raw.get("zipcode") is not None else None,
         city=raw.get("city"),
         lat=raw.get("latitude"),
         lng=raw.get("longitude"),

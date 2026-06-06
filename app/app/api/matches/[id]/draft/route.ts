@@ -10,7 +10,7 @@ import {
   substitutePlaceholders,
 } from "@/lib/prompts/draft_message";
 
-const DRAFT_MODEL = "claude-sonnet-4-5-20251001";
+const DRAFT_MODEL = "claude-3-5-sonnet-20241022";
 
 export async function POST(
   _request: NextRequest,

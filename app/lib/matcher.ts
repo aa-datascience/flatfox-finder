@@ -54,6 +54,8 @@ interface ListingWithAttrs {
   slug: string;
   url: string;
   city: string | null;
+  rentNet: number | null;
+  rentCharges: number | null;
   rentGross: number | null;
   numberOfRooms: number | null;
   movingDate: Date | null;
@@ -210,16 +212,22 @@ function computeMatch(
   rationale: string;
   listingSnapshot: Prisma.JsonObject;
 } | null {
+  // Compute effective gross rent
+  const effectiveGross =
+    listing.rentGross ??
+    (listing.rentNet != null
+      ? listing.rentNet + (listing.rentCharges ?? 0)
+      : null);
+
+  // Hard filter: exclude listings with no rent info
+  if (effectiveGross == null) return null;
+
   // Hard filter: skip listings over budget
-  if (
-    profile.budgetMax != null &&
-    listing.rentGross != null &&
-    listing.rentGross > profile.budgetMax
-  ) {
+  if (profile.budgetMax != null && effectiveGross > profile.budgetMax) {
     return null;
   }
 
-  const [ps, pr] = priceScore(listing.rentGross, profile.budgetMax);
+  const [ps, pr] = priceScore(effectiveGross, profile.budgetMax);
   const [ls, lr] = locationScore(listing.lat, listing.lng, listing.city, profile.cities, profile.radiusKm);
   const [rs, rr] = roomsScore(listing.numberOfRooms, profile.roomsMin);
   const [ds, dr] = dateScore(listing.movingDate, profile.moveInFrom, profile.moveInFlexible);
@@ -244,7 +252,9 @@ function computeMatch(
     listingSnapshot: {
       title: listing.publicTitle ?? "",
       city: listing.city ?? "",
-      price: listing.rentGross,
+      price: effectiveGross,
+      rent_net: listing.rentNet,
+      rent_charges: listing.rentCharges,
     } as Prisma.JsonObject,
   };
 }
@@ -278,6 +288,8 @@ export async function runMatchingForUser(userId: string): Promise<number> {
       slug: true,
       url: true,
       city: true,
+      rentNet: true,
+      rentCharges: true,
       rentGross: true,
       numberOfRooms: true,
       movingDate: true,

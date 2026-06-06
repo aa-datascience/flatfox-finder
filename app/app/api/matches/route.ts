@@ -41,6 +41,8 @@ export async function GET(request: NextRequest) {
             shortTitle: true,
             city: true,
             zipcode: true,
+            rentNet: true,
+            rentCharges: true,
             rentGross: true,
             numberOfRooms: true,
             surfaceLiving: true,

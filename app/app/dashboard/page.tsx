@@ -13,6 +13,8 @@ interface MatchListing {
   shortTitle: string | null;
   city: string | null;
   zipcode: string | null;
+  rentNet: number | null;
+  rentCharges: number | null;
   rentGross: number | null;
   numberOfRooms: number | null;
   surfaceLiving: number | null;
@@ -227,6 +229,8 @@ function MatchCard({
     "Untitled listing";
   const city =
     listing?.city ?? (snapshot.city as string) ?? "Unknown";
+  const rentNet = listing?.rentNet ?? (snapshot.rent_net as number | null) ?? null;
+  const rentCharges = listing?.rentCharges ?? (snapshot.rent_charges as number | null) ?? null;
   const price =
     listing?.rentGross ?? (snapshot.price as number) ?? null;
   const rooms = listing?.numberOfRooms ?? null;
@@ -261,7 +265,16 @@ function MatchCard({
 
           <div className="flex items-center gap-3 text-sm text-gray-500">
             <span>{city}</span>
-            {price != null && <span>CHF {price}/mo</span>}
+            {price != null && (
+              <span>
+                CHF {price}/mo
+                {rentNet != null && rentCharges != null && (
+                  <span className="text-gray-400 ml-1">
+                    ({rentNet} + {rentCharges})
+                  </span>
+                )}
+              </span>
+            )}
             {rooms != null && (
               <span>
                 {rooms} room{rooms !== 1 ? "s" : ""}

@@ -47,6 +47,8 @@ class ListingWithAttrs:
     slug: str
     url: str
     city: str | None = None
+    rent_net: float | None = None
+    rent_charges: float | None = None
     rent_gross: float | None = None
     number_of_rooms: float | None = None
     moving_date: datetime | None = None
@@ -215,15 +217,20 @@ def layer2_score(profile: Profile, listing: ListingWithAttrs) -> tuple[float, li
 
 
 def compute_match(profile: Profile, listing: ListingWithAttrs) -> dict[str, Any] | None:
-    # Hard filter: skip listings over budget
-    if (
-        profile.budget_max is not None
-        and listing.rent_gross is not None
-        and listing.rent_gross > profile.budget_max
-    ):
+    # Compute effective gross rent
+    effective_gross = listing.rent_gross
+    if effective_gross is None and listing.rent_net is not None:
+        effective_gross = listing.rent_net + (listing.rent_charges or 0)
+
+    # Hard filter: exclude listings with no rent info
+    if effective_gross is None:
         return None
 
-    ps, pr = price_score(listing.rent_gross, profile.budget_max)
+    # Hard filter: skip listings over budget
+    if profile.budget_max is not None and effective_gross > profile.budget_max:
+        return None
+
+    ps, pr = price_score(effective_gross, profile.budget_max)
     ls, lr = location_score(listing.lat, listing.lng, listing.city, profile.cities, profile.radius_km)
     rs, rr = rooms_score(listing.number_of_rooms, profile.rooms_min)
     ds, dr = date_score(listing.moving_date, profile.move_in_from, profile.move_in_flexible)
@@ -256,7 +263,9 @@ def compute_match(profile: Profile, listing: ListingWithAttrs) -> dict[str, Any]
         "listing_snapshot": {
             "title": listing.public_title or "",
             "city": listing.city or "",
-            "price": listing.rent_gross,
+            "price": effective_gross,
+            "rent_net": listing.rent_net,
+            "rent_charges": listing.rent_charges,
         },
     }
 
@@ -293,7 +302,9 @@ def _load_profiles(conn) -> list[Profile]:
 def _load_listings(conn) -> list[ListingWithAttrs]:
     with conn.cursor() as cur:
         cur.execute("""
-            SELECT l.id, l.slug, l.url, l.city, l.rent_gross, l.number_of_rooms,
+            SELECT l.id, l.slug, l.url, l.city,
+                   l.rent_net, l.rent_charges, l.rent_gross,
+                   l.number_of_rooms,
                    l.moving_date, l.lat, l.lng, l.public_title,
                    la.flatmate_count, la.languages, la.vibe, la.pets, la.smoking,
                    la.gender_pref, la.move_in_flexible
@@ -305,11 +316,12 @@ def _load_listings(conn) -> list[ListingWithAttrs]:
         for row in cur.fetchall():
             listings.append(ListingWithAttrs(
                 id=row[0], slug=row[1], url=row[2], city=row[3],
-                rent_gross=row[4], number_of_rooms=row[5],
-                moving_date=row[6], lat=row[7], lng=row[8], public_title=row[9],
-                flatmate_count=row[10], languages=row[11] or [],
-                vibe=row[12], pets=row[13], smoking=row[14],
-                gender_pref=row[15], move_in_flexible=row[16],
+                rent_net=row[4], rent_charges=row[5], rent_gross=row[6],
+                number_of_rooms=row[7],
+                moving_date=row[8], lat=row[9], lng=row[10], public_title=row[11],
+                flatmate_count=row[12], languages=row[13] or [],
+                vibe=row[14], pets=row[15], smoking=row[16],
+                gender_pref=row[17], move_in_flexible=row[18],
             ))
         return listings
 

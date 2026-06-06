@@ -52,9 +52,10 @@ CLAUDE.md     → this file
 - Commit messages: conventional commits (feat:, fix:, chore:).
 
 ## Architecture Rules
-- Batch AI (listing extraction, matching) → Python worker only.
+- Batch AI (listing extraction) → Python worker only.
+- Matching → dual: Python worker (batch, for new listings) AND Next.js (on-demand, when profile saved). TypeScript matcher in `app/lib/matcher.ts` mirrors Python `worker/src/flatfox_worker/matcher.py` — keep in sync.
 - On-demand AI (profile parsing, message drafting) → Next.js API routes via @anthropic-ai/sdk.
-- Python worker and Next.js do NOT call each other. They share Postgres.
+- Python worker and Next.js do NOT call each other. They share Postgres (and independent matching logic).
 - All Flatfox API calls go through /worker/flatfox_client.py, which implements BaseListingClient.
 - New platforms = new client implementing BaseListingClient. Don't modify ingestion logic.
 - Images: prepend https://flatfox.ch to relative /thumb/ URLs from the API.
@@ -73,7 +74,7 @@ All 15 tasks are **done and committed**. App is **live on Railway**.
 | 3 | Flatfox client | ✅ | `worker/src/flatfox_worker/flatfox_client.py` — pagination, filtering, retry |
 | 4 | Ingestion job | ✅ | `worker/src/flatfox_worker/ingestion.py` — upsert, flag removed |
 | 5 | Listing extractor | ✅ | `worker/src/flatfox_worker/extractor.py`, `worker/prompts/extract_listing.txt`, `pii.py` |
-| 6 | Matching engine | ✅ | `worker/src/flatfox_worker/matcher.py` — two-layer scoring, 35 tests |
+| 6 | Matching engine | ✅ | `worker/src/flatfox_worker/matcher.py` (batch), `app/lib/matcher.ts` (on-demand) — two-layer scoring |
 | 7 | Message drafter | ✅ | `app/app/api/matches/[id]/draft/route.ts`, `app/lib/prompts/draft_message.ts`, `app/lib/pii.ts` |
 | 8 | Auth | ✅ | `app/lib/auth-options.ts`, `app/app/api/auth/signup/route.ts`, `app/app/api/auth/[...nextauth]/route.ts` |
 | 9 | Onboarding | ✅ | `app/app/onboarding/page.tsx`, `app/app/api/profile/route.ts`, `app/app/api/profile/parse/route.ts`, `app/lib/prompts/parse_profile.ts`, `app/middleware.ts` |

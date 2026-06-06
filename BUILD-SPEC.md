@@ -80,9 +80,10 @@ Steps run in strict sequence, never overlap.
 
 ### Communication pattern
 
-- **Batch AI** (extraction, matching) → Python worker, reads/writes Postgres directly.
+- **Batch AI** (extraction) → Python worker, reads/writes Postgres directly.
+- **On-demand matching** — scoring logic runs in both: Python worker (batch, for new listings) AND Next.js (on-demand, when profile is saved via `PUT /api/profile`). The TypeScript matcher in `app/lib/matcher.ts` mirrors the Python logic in `worker/src/flatfox_worker/matcher.py`. Keep them in sync.
 - **On-demand AI** (profile parsing, message drafting) → Next.js API routes via `@anthropic-ai/sdk` (TypeScript).
-- **Shared state:** Postgres is the single source of truth. Python and Next.js do NOT call each other.
+- **Shared state:** Postgres is the single source of truth. Python and Next.js do NOT call each other (except they share matching logic independently).
 
 ### Matching engine (two-layer)
 

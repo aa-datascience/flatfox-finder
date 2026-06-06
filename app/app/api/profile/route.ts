@@ -2,6 +2,7 @@ import { NextResponse } from "next/server";
 
 import { getSessionUserId, unauthorized } from "@/lib/auth";
 import { prisma } from "@/lib/db";
+import { runMatchingForUser } from "@/lib/matcher";
 
 export async function GET() {
   const userId = await getSessionUserId();
@@ -44,6 +45,10 @@ export async function PUT(request: Request) {
     create: { userId, ...data },
     update: data,
   });
+
+  // Re-score all listings against updated preferences
+  await prisma.match.deleteMany({ where: { userId } });
+  await runMatchingForUser(userId);
 
   if (body.name || body.locale) {
     await prisma.user.update({

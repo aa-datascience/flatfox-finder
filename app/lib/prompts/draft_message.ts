@@ -5,7 +5,7 @@ about a housing listing. The message should:
 - Mention 1–2 specific things about the listing that match the student's profile.
 - Briefly introduce the student using the placeholders provided ({STUDENT_NAME}, {STUDENT_PROGRAM}).
 - End with a polite request to visit or chat.
-- Be written in the SAME LANGUAGE as the listing description.
+- Be written in the LANGUAGE specified in the instructions below. This is critical.
 - Do NOT include a subject line.`;
 
 export function buildDraftUserMessage(params: {
@@ -20,12 +20,15 @@ export function buildDraftUserMessage(params: {
   budgetMax: number | null;
   moveInFrom: string | null;
   rationale: string;
+  writeInLanguage: string;
 }): string {
   return `Listing title: ${params.publicTitle}
 Listing description: ${params.description}
 Listing city: ${params.city}, rent: CHF ${params.rentGross ?? "unknown"}/mo, rooms: ${params.numberOfRooms ?? "unknown"}
 Student profile: {STUDENT_NAME}, studying {STUDENT_PROGRAM}, speaks ${params.studentLanguage}, budget CHF ${params.budgetMax ?? "unknown"}/mo, moving from ${params.moveInFrom ?? "flexible"}
-Match rationale: ${params.rationale}`;
+Match rationale: ${params.rationale}
+
+IMPORTANT: Write the message in ${params.writeInLanguage}.`;
 }
 
 export function substitutePlaceholders(

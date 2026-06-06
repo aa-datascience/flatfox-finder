@@ -38,6 +38,7 @@ export async function PUT(request: Request) {
     petsOk: body.pets_ok ?? null,
     smokingOk: body.smoking_ok ?? null,
     genderPref: body.gender_pref ?? null,
+    messageLanguage: body.message_language ?? "description",
   };
 
   const profile = await prisma.userProfile.upsert({

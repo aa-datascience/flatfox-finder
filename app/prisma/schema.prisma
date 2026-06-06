@@ -43,6 +43,7 @@ model UserProfile {
   petsOk          Boolean?  @map("pets_ok")
   smokingOk       Boolean?  @map("smoking_ok")
   genderPref      String?   @map("gender_pref") @db.VarChar(15)
+  messageLanguage String    @default("description") @map("message_language") @db.VarChar(20)
   updatedAt       DateTime  @updatedAt @map("updated_at")
 
   @@map("user_profiles")

@@ -11,6 +11,11 @@ const CITY_OPTIONS = [
 const LANGUAGE_OPTIONS = ["DE", "FR", "EN", "IT"];
 const VIBE_OPTIONS = ["quiet", "social", "mixed"] as const;
 const GENDER_PREF_OPTIONS = ["any", "female_only", "male_only"] as const;
+const MESSAGE_LANG_OPTIONS = [
+  { value: "english", label: "Always in English" },
+  { value: "my_language", label: "My language (if it matches the listing)" },
+  { value: "description", label: "Language of the listing description" },
+] as const;
 const LOCALE_OPTIONS = [
   { value: "de", label: "Deutsch" },
   { value: "fr", label: "Français" },
@@ -33,6 +38,7 @@ interface ProfileData {
   pets_ok: boolean | null;
   smoking_ok: boolean | null;
   gender_pref: string;
+  message_language: string;
 }
 
 const EMPTY_PROFILE: ProfileData = {
@@ -50,6 +56,7 @@ const EMPTY_PROFILE: ProfileData = {
   pets_ok: null,
   smoking_ok: null,
   gender_pref: "",
+  message_language: "description",
 };
 
 type Section = "profile" | "password" | "delete";
@@ -101,6 +108,7 @@ export default function SettingsPage() {
           pets_ok: p.petsOk ?? null,
           smoking_ok: p.smokingOk ?? null,
           gender_pref: p.genderPref ?? "",
+          message_language: p.messageLanguage ?? "description",
         });
       } finally {
         setProfileLoading(false);
@@ -142,6 +150,7 @@ export default function SettingsPage() {
           pets_ok: profile.pets_ok,
           smoking_ok: profile.smoking_ok,
           gender_pref: profile.gender_pref || null,
+          message_language: profile.message_language,
           input_mode: "form",
         }),
       });
@@ -414,6 +423,24 @@ export default function SettingsPage() {
                     >
                       {g === "any" ? "Any" : g === "female_only" ? "Female only" : "Male only"}
                     </button>
+                  ))}
+                </div>
+              </Field>
+
+              <Field label="Contact message language">
+                <div className="flex flex-col gap-2">
+                  {MESSAGE_LANG_OPTIONS.map((o) => (
+                    <label key={o.value} className="flex items-center gap-2 text-sm">
+                      <input
+                        type="radio"
+                        name="message_language"
+                        value={o.value}
+                        checked={profile.message_language === o.value}
+                        onChange={() => setProfile({ ...profile, message_language: o.value })}
+                        className="accent-blue-600"
+                      />
+                      {o.label}
+                    </label>
                   ))}
                 </div>
               </Field>

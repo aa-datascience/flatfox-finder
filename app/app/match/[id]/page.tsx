@@ -69,6 +69,11 @@ export default function MatchDetailPage() {
   const [copied, setCopied] = useState(false);
   const textareaRef = useRef<HTMLTextAreaElement>(null);
 
+  const [translatedDesc, setTranslatedDesc] = useState<string | null>(null);
+  const [originalLang, setOriginalLang] = useState<string | null>(null);
+  const [translating, setTranslating] = useState(false);
+  const [showOriginal, setShowOriginal] = useState(false);
+
   useEffect(() => {
     async function load() {
       try {
@@ -79,6 +84,21 @@ export default function MatchDetailPage() {
         if (detail.message_draft) {
           setDraft(detail.message_draft);
           setShowEditor(true);
+        }
+        if (detail.listing?.description) {
+          setTranslating(true);
+          try {
+            const tRes = await fetch(`/api/matches/${id}/translate`, { method: "POST" });
+            if (tRes.ok) {
+              const tData = await tRes.json();
+              setTranslatedDesc(tData.translated);
+              setOriginalLang(tData.original_language);
+            }
+          } catch {
+            /* translation is non-critical */
+          } finally {
+            setTranslating(false);
+          }
         }
       } catch {
         setError("Match not found.");
@@ -304,12 +324,33 @@ export default function MatchDetailPage() {
           {/* Description */}
           {listing.description && (
             <div className="mt-4 pt-4 border-t border-gray-100">
-              <h3 className="text-xs font-medium text-gray-500 uppercase mb-2">
-                Description
-              </h3>
-              <p className="text-sm text-gray-700 whitespace-pre-line">
-                {listing.description}
-              </p>
+              <div className="flex items-center justify-between mb-2">
+                <h3 className="text-xs font-medium text-gray-500 uppercase">
+                  Description
+                  {translatedDesc && originalLang && !showOriginal && (
+                    <span className="ml-2 font-normal normal-case text-gray-400">
+                      — translated from {originalLang.toUpperCase()}
+                    </span>
+                  )}
+                </h3>
+                {translatedDesc && (
+                  <button
+                    onClick={() => setShowOriginal(!showOriginal)}
+                    className="text-xs text-blue-600 hover:underline"
+                  >
+                    {showOriginal ? "Show translation" : "Show original"}
+                  </button>
+                )}
+              </div>
+              {translating ? (
+                <p className="text-sm text-gray-400">Translating…</p>
+              ) : (
+                <p className="text-sm text-gray-700 whitespace-pre-line">
+                  {showOriginal || !translatedDesc
+                    ? listing.description
+                    : translatedDesc}
+                </p>
+              )}
             </div>
           )}
         </div>

@@ -12,6 +12,59 @@ import {
 
 const DRAFT_MODEL = "claude-sonnet-4-5-20250929";
 
+const LOCALE_NAMES: Record<string, string> = {
+  en: "English",
+  de: "German",
+  fr: "French",
+  it: "Italian",
+};
+
+function resolveMessageLanguage(
+  preference: string,
+  userLocale: string,
+  descriptionLang: string | null,
+): string {
+  switch (preference) {
+    case "english":
+      return "English";
+    case "my_language": {
+      const userLang = LOCALE_NAMES[userLocale] ?? "English";
+      if (descriptionLang && LOCALE_NAMES[descriptionLang] === userLang) {
+        return userLang;
+      }
+      return userLang;
+    }
+    case "description":
+    default:
+      if (descriptionLang && LOCALE_NAMES[descriptionLang]) {
+        return LOCALE_NAMES[descriptionLang];
+      }
+      return "the same language as the listing description";
+  }
+}
+
+async function detectDescriptionLanguage(
+  client: Anthropic,
+  description: string,
+): Promise<string | null> {
+  try {
+    const resp = await client.messages.create({
+      model: "claude-haiku-4-5-20251001",
+      max_tokens: 10,
+      messages: [
+        {
+          role: "user",
+          content: `What language is this text written in? Reply with ONLY the 2-letter ISO code (de, fr, it, en, etc). If bilingual, pick the primary one.\n\n${description.slice(0, 500)}`,
+        },
+      ],
+    });
+    const code = resp.content[0].type === "text" ? resp.content[0].text.trim().toLowerCase().slice(0, 2) : null;
+    return code;
+  } catch {
+    return null;
+  }
+}
+
 export async function POST(
   _request: NextRequest,
   { params }: { params: Promise<{ id: string }> }
@@ -57,6 +110,20 @@ export async function POST(
   const sanitizedDescription = stripPii(match.listing.description ?? "");
   const sanitizedTitle = stripPii(match.listing.publicTitle ?? "");
 
+  const client = new Anthropic();
+
+  const messagePref = profile.messageLanguage ?? "description";
+  let descriptionLang: string | null = null;
+  if (messagePref === "description" || messagePref === "my_language") {
+    descriptionLang = await detectDescriptionLanguage(client, sanitizedDescription);
+  }
+
+  const writeInLanguage = resolveMessageLanguage(
+    messagePref,
+    user.locale,
+    descriptionLang,
+  );
+
   const userMessage = buildDraftUserMessage({
     publicTitle: sanitizedTitle,
     description: sanitizedDescription,
@@ -69,10 +136,10 @@ export async function POST(
     budgetMax: profile.budgetMax,
     moveInFrom: profile.moveInFrom?.toISOString().split("T")[0] ?? null,
     rationale: match.rationale ?? "",
+    writeInLanguage,
   });
 
   try {
-    const client = new Anthropic();
     const response = await client.messages.create({
       model: DRAFT_MODEL,
       max_tokens: 500,
@@ -89,19 +156,23 @@ export async function POST(
       language: user.locale,
     });
 
-    // Save as draft message
+    const resolvedLang = descriptionLang ?? user.locale;
+
     await prisma.message.create({
       data: {
         matchId: match.id,
         userId: user.id,
         body: messageBody,
-        language: user.locale,
+        language: resolvedLang,
         mode: "review",
         status: "draft",
       },
     });
 
-    return NextResponse.json({ message_body: messageBody });
+    return NextResponse.json({
+      message_body: messageBody,
+      language: writeInLanguage,
+    });
   } catch (error) {
     const msg = error instanceof Error ? error.message : String(error);
     console.error("[draft] generation failed:", msg);

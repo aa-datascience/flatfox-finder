@@ -17,6 +17,7 @@ PROMPT_PATH = Path(__file__).resolve().parent.parent.parent / "prompts" / "extra
 SYSTEM_PROMPT = PROMPT_PATH.read_text(encoding="utf-8").split("System: ", 1)[1]
 
 EXTRACTION_MODEL = "claude-haiku-4-5-20241022"
+MAX_EXTRACTIONS_PER_RUN = 500  # cap per run to control costs
 
 VALID_VIBES = {"quiet", "social", "mixed"}
 VALID_GENDER = {"any", "female_only", "male_only"}
@@ -217,6 +218,8 @@ def run_extraction(database_url: str | None = None) -> int:
             return 0
 
         logger.info("%d listings need extraction.", len(listings))
+        listings = listings[:MAX_EXTRACTIONS_PER_RUN]
+        logger.info("Capped to %d listings for this run.", len(listings))
 
         ai_client = anthropic.Anthropic(api_key=settings.anthropic_api_key)
 

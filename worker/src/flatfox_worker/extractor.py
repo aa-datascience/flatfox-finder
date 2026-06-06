@@ -1,6 +1,5 @@
 import json
 import logging
-import time
 from datetime import datetime, timezone
 from pathlib import Path
 from typing import Any
@@ -18,7 +17,6 @@ PROMPT_PATH = Path(__file__).resolve().parent.parent.parent / "prompts" / "extra
 SYSTEM_PROMPT = PROMPT_PATH.read_text(encoding="utf-8").split("System: ", 1)[1]
 
 EXTRACTION_MODEL = "claude-haiku-4-5-20241022"
-BATCH_THRESHOLD = 100
 
 VALID_VIBES = {"quiet", "social", "mixed"}
 VALID_GENDER = {"any", "female_only", "male_only"}
@@ -222,10 +220,7 @@ def run_extraction(database_url: str | None = None) -> int:
 
         ai_client = anthropic.Anthropic(api_key=settings.anthropic_api_key)
 
-        if len(listings) > BATCH_THRESHOLD:
-            rows = _extract_batch(ai_client, listings)
-        else:
-            rows = _extract_sequential(ai_client, listings)
+        rows = _extract_sequential(ai_client, listings)
 
         _save_attributes(conn, rows)
         logger.info("Extracted attributes for %d listings.", len(rows))

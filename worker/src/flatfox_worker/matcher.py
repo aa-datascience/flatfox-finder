@@ -230,6 +230,22 @@ def compute_match(profile: Profile, listing: ListingWithAttrs) -> dict[str, Any]
     if profile.budget_max is not None and effective_gross > profile.budget_max:
         return None
 
+    # Hard filter: skip listings outside radius of all preferred cities
+    if profile.cities:
+        within_radius = False
+        for pc in profile.cities:
+            coords = _get_city_coords(pc)
+            if coords and listing.lat is not None and listing.lng is not None:
+                dist = _haversine(coords[0], coords[1], listing.lat, listing.lng)
+                if dist <= profile.radius_km:
+                    within_radius = True
+                    break
+            elif listing.city and pc.lower().strip() == listing.city.lower().strip():
+                within_radius = True
+                break
+        if not within_radius:
+            return None
+
     ps, pr = price_score(effective_gross, profile.budget_max)
     ls, lr = location_score(listing.lat, listing.lng, listing.city, profile.cities, profile.radius_km)
     rs, rr = rooms_score(listing.number_of_rooms, profile.rooms_min)

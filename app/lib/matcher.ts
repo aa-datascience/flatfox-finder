@@ -227,6 +227,28 @@ function computeMatch(
     return null;
   }
 
+  // Hard filter: skip listings outside radius of all preferred cities
+  if (profile.cities.length > 0) {
+    let withinRadius = false;
+    for (const pc of profile.cities) {
+      const coords = CITY_COORDS[pc.toLowerCase().trim()];
+      if (coords && listing.lat != null && listing.lng != null) {
+        const dist = haversine(coords[0], coords[1], listing.lat, listing.lng);
+        if (dist <= profile.radiusKm) {
+          withinRadius = true;
+          break;
+        }
+      } else if (
+        listing.city &&
+        pc.toLowerCase().trim() === listing.city.toLowerCase().trim()
+      ) {
+        withinRadius = true;
+        break;
+      }
+    }
+    if (!withinRadius) return null;
+  }
+
   const [ps, pr] = priceScore(effectiveGross, profile.budgetMax);
   const [ls, lr] = locationScore(listing.lat, listing.lng, listing.city, profile.cities, profile.radiusKm);
   const [rs, rr] = roomsScore(listing.numberOfRooms, profile.roomsMin);

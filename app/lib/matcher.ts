@@ -210,6 +210,15 @@ function computeMatch(
   rationale: string;
   listingSnapshot: Prisma.JsonObject;
 } | null {
+  // Hard filter: skip listings over budget
+  if (
+    profile.budgetMax != null &&
+    listing.rentGross != null &&
+    listing.rentGross > profile.budgetMax
+  ) {
+    return null;
+  }
+
   const [ps, pr] = priceScore(listing.rentGross, profile.budgetMax);
   const [ls, lr] = locationScore(listing.lat, listing.lng, listing.city, profile.cities, profile.radiusKm);
   const [rs, rr] = roomsScore(listing.numberOfRooms, profile.roomsMin);

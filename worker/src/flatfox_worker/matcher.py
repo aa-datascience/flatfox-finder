@@ -215,6 +215,14 @@ def layer2_score(profile: Profile, listing: ListingWithAttrs) -> tuple[float, li
 
 
 def compute_match(profile: Profile, listing: ListingWithAttrs) -> dict[str, Any] | None:
+    # Hard filter: skip listings over budget
+    if (
+        profile.budget_max is not None
+        and listing.rent_gross is not None
+        and listing.rent_gross > profile.budget_max
+    ):
+        return None
+
     ps, pr = price_score(listing.rent_gross, profile.budget_max)
     ls, lr = location_score(listing.lat, listing.lng, listing.city, profile.cities, profile.radius_km)
     rs, rr = rooms_score(listing.number_of_rooms, profile.rooms_min)

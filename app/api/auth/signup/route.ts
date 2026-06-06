@@ -33,29 +33,34 @@ export async function POST(request: NextRequest) {
 
   const userLocale = locale && VALID_LOCALES.includes(locale) ? locale : "en";
 
-  const existing = await prisma.user.findUnique({ where: { email } });
-  if (existing) {
-    return NextResponse.json(
-      { error: "An account with this email already exists" },
-      { status: 409 }
-    );
-  }
+  try {
+    const existing = await prisma.user.findUnique({ where: { email } });
+    if (existing) {
+      return NextResponse.json(
+        { error: "An account with this email already exists" },
+        { status: 409 }
+      );
+    }
 
-  const passwordHash = await hash(password, BCRYPT_ROUNDS);
+    const passwordHash = await hash(password, BCRYPT_ROUNDS);
 
-  const user = await prisma.user.create({
-    data: {
-      email,
-      passwordHash,
-      name,
-      locale: userLocale,
-      consentFlags: {
-        accepted_terms: true,
-        accepted_privacy: true,
-        consent_at: new Date().toISOString(),
+    const user = await prisma.user.create({
+      data: {
+        email,
+        passwordHash,
+        name,
+        locale: userLocale,
+        consentFlags: {
+          accepted_terms: true,
+          accepted_privacy: true,
+          consent_at: new Date().toISOString(),
+        },
       },
-    },
-  });
+    });
 
-  return NextResponse.json({ user_id: user.id }, { status: 201 });
+    return NextResponse.json({ user_id: user.id }, { status: 201 });
+  } catch (err) {
+    console.error("[signup] error:", err);
+    return NextResponse.json({ error: "Internal server error" }, { status: 500 });
+  }
 }

@@ -16,7 +16,7 @@ logger = logging.getLogger(__name__)
 PROMPT_PATH = Path(__file__).resolve().parent.parent.parent / "prompts" / "extract_listing.txt"
 SYSTEM_PROMPT = PROMPT_PATH.read_text(encoding="utf-8").split("System: ", 1)[1]
 
-EXTRACTION_MODEL = "claude-haiku-4-5-20241022"
+EXTRACTION_MODEL = "claude-haiku-4-5-20251001"
 MAX_EXTRACTIONS_PER_RUN = 500  # cap per run to control costs
 
 VALID_VIBES = {"quiet", "social", "mixed"}

@@ -94,12 +94,12 @@ export default function MatchDetailPage() {
     setDraftError(null);
     try {
       const res = await fetch(`/api/matches/${id}/draft`, { method: "POST" });
-      if (!res.ok) throw new Error();
-      const { message_body } = await res.json();
-      setDraft(message_body);
+      const data = await res.json();
+      if (!res.ok) throw new Error(data.error ?? `HTTP ${res.status}`);
+      setDraft(data.message_body);
       setShowEditor(true);
-    } catch {
-      setDraftError("Couldn't generate — try again.");
+    } catch (e) {
+      setDraftError(`Error: ${e instanceof Error ? e.message : String(e)}`);
     } finally {
       setDrafting(false);
     }

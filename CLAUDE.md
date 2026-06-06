@@ -124,6 +124,8 @@ Available models for this account (from /api/debug/models):
 ## Worker behaviour
 - Ingestion: fetches max 50 pages (5000 listings) per run — configurable via `FLATFOX_MAX_PAGES`
 - Extraction: processes max 500 listings per run — configurable via `MAX_EXTRACTIONS_PER_RUN` in extractor.py
+- Extraction pre-filters: only extracts listings that could match at least one profile (budget + location hard filters). Listings that can't match anyone are skipped to save Claude API calls.
+- Extraction caching: listings are only extracted once (LEFT JOIN on listing_attributes skips already-extracted). Never re-extracts.
 - ~20k listings in DB total; extraction backlog processed gradually over multiple runs
 - Flatfox API returns zipcode as int — normalised to str in flatfox_client.py
 - Flatfox listing status is normalised to "active" in _normalize() — matcher queries for status='active'

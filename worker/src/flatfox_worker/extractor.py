@@ -9,6 +9,7 @@ import psycopg2
 from psycopg2.extras import execute_values
 
 from flatfox_worker.config import settings
+from flatfox_worker.matcher import _haversine
 from flatfox_worker.pii import strip_pii
 
 logger = logging.getLogger(__name__)
@@ -61,15 +62,110 @@ def _build_user_message(title: str | None, description: str | None) -> str:
     return f"Title: {title}\nDescription: {description}"
 
 
-def _fetch_unextracted(conn) -> list[dict[str, Any]]:
+def _load_profile_constraints(conn) -> list[dict[str, Any]]:
+    """Load hard-filter criteria from all active profiles."""
     with conn.cursor() as cur:
         cur.execute("""
-            SELECT l.id, l.public_title, l.description
+            SELECT up.budget_max, up.cities, up.radius_km
+            FROM user_profiles up
+            JOIN users u ON u.id = up.user_id
+        """)
+        return [
+            {"budget_max": row[0], "cities": row[1] or [], "radius_km": row[2] or 10}
+            for row in cur.fetchall()
+        ]
+
+
+CITY_COORDS: dict[str, tuple[float, float]] = {
+    "zürich": (47.3769, 8.5417),
+    "zurich": (47.3769, 8.5417),
+    "lausanne": (46.5197, 6.6323),
+    "genève": (46.2044, 6.1432),
+    "geneva": (46.2044, 6.1432),
+    "geneve": (46.2044, 6.1432),
+    "basel": (47.5596, 7.5886),
+    "bern": (46.9480, 7.4474),
+    "winterthur": (47.5001, 8.7240),
+    "luzern": (47.0502, 8.3093),
+    "lucerne": (47.0502, 8.3093),
+    "st. gallen": (47.4245, 9.3767),
+    "st.gallen": (47.4245, 9.3767),
+    "lugano": (46.0037, 8.9511),
+    "fribourg": (46.8065, 7.1620),
+    "neuchâtel": (46.9900, 6.9293),
+    "neuchatel": (46.9900, 6.9293),
+}
+
+
+def _could_match_any_profile(
+    listing: dict[str, Any],
+    profiles: list[dict[str, Any]],
+) -> bool:
+    """Return True if listing could pass hard filters for at least one profile."""
+    if not profiles:
+        return False
+
+    rent = listing.get("rent_gross")
+    lat = listing.get("lat")
+    lng = listing.get("lng")
+    city = listing.get("city")
+
+    for p in profiles:
+        # Budget check: skip if listing is over this profile's budget
+        if p["budget_max"] is not None and rent is not None and rent > p["budget_max"]:
+            continue
+
+        # Location check: skip if listing is outside 2x radius of all preferred cities
+        if p["cities"]:
+            location_ok = False
+            for pc in p["cities"]:
+                coords = CITY_COORDS.get(pc.lower().strip())
+                if coords is None:
+                    if city and pc.lower().strip() == city.lower().strip():
+                        location_ok = True
+                        break
+                    continue
+                if lat is not None and lng is not None:
+                    dist = _haversine(coords[0], coords[1], lat, lng)
+                    if dist <= 2 * p["radius_km"]:
+                        location_ok = True
+                        break
+                elif city and pc.lower().strip() == city.lower().strip():
+                    location_ok = True
+                    break
+            if not location_ok:
+                continue
+
+        return True
+
+    return False
+
+
+def _fetch_unextracted(conn, profiles: list[dict[str, Any]] | None = None) -> list[dict[str, Any]]:
+    with conn.cursor() as cur:
+        cur.execute("""
+            SELECT l.id, l.public_title, l.description, l.rent_gross, l.lat, l.lng, l.city
             FROM listings l
             LEFT JOIN listing_attributes la ON la.listing_id = l.id
             WHERE la.listing_id IS NULL AND l.status != 'removed'
         """)
-        return [{"id": row[0], "title": row[1], "description": row[2]} for row in cur.fetchall()]
+        all_listings = [
+            {
+                "id": row[0], "title": row[1], "description": row[2],
+                "rent_gross": row[3], "lat": row[4], "lng": row[5], "city": row[6],
+            }
+            for row in cur.fetchall()
+        ]
+
+    if profiles is None or len(profiles) == 0:
+        return all_listings
+
+    before = len(all_listings)
+    filtered = [l for l in all_listings if _could_match_any_profile(l, profiles)]
+    skipped = before - len(filtered)
+    if skipped > 0:
+        logger.info("Skipped %d/%d listings that can't match any profile.", skipped, before)
+    return filtered
 
 
 def _save_attributes(conn, rows: list[tuple]) -> None:
@@ -212,7 +308,8 @@ def run_extraction(database_url: str | None = None) -> int:
     conn = psycopg2.connect(db_url)
 
     try:
-        listings = _fetch_unextracted(conn)
+        profiles = _load_profile_constraints(conn)
+        listings = _fetch_unextracted(conn, profiles)
         if not listings:
             logger.info("No listings need extraction.")
             return 0

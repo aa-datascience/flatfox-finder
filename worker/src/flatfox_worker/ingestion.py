@@ -78,11 +78,15 @@ def _listing_to_tuple(listing: NormalizedListing, now: datetime) -> tuple:
     )
 
 
-def run_ingestion(client: BaseListingClient, database_url: str | None = None) -> dict[str, int]:
+def run_ingestion(
+    client: BaseListingClient,
+    database_url: str | None = None,
+    max_pages: int | None = None,
+) -> dict[str, int]:
     db_url = database_url or settings.database_url
     now = datetime.now(timezone.utc)
 
-    listings = list(client.fetch_listings())
+    listings = list(client.fetch_listings(max_pages=max_pages))
     if not listings:
         logger.warning("No listings fetched — skipping ingestion.")
         return {"fetched": 0, "new": 0, "updated": 0, "removed": 0}

@@ -22,7 +22,7 @@ def run_pipeline() -> None:
 
     client = FlatfoxClient()
     try:
-        stats = run_ingestion(client)
+        stats = run_ingestion(client, max_pages=settings.flatfox_max_pages)
         logger.info("Ingestion stats: %s", stats)
     finally:
         client.close()

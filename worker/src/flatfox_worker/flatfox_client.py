@@ -130,17 +130,24 @@ class FlatfoxClient(BaseListingClient):
             f"Flatfox API failed after {self.max_retries} retries (offset={offset})"
         ) from last_exc
 
-    def fetch_listings(self) -> Iterator[NormalizedListing]:
+    def fetch_listings(self, max_pages: int | None = None) -> Iterator[NormalizedListing]:
         offset = 0
         total_fetched = 0
         total_kept = 0
+        pages_fetched = 0
 
         while True:
+            if max_pages is not None and pages_fetched >= max_pages:
+                logger.info("Reached max_pages=%d limit — stopping early.", max_pages)
+                break
+
             data = self._fetch_page(offset)
             results: list[dict[str, Any]] = data.get("results", [])
 
             if not results:
                 break
+
+            pages_fetched += 1
 
             for raw in results:
                 total_fetched += 1

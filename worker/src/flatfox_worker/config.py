@@ -12,6 +12,7 @@ class Settings(BaseSettings):
     flatfox_page_size: int = 100
     flatfox_page_delay: float = 0.5
     flatfox_max_retries: int = 3
+    flatfox_max_pages: int = 50  # 50 pages × 100 = 5000 listings per run (~3 min)
     smtp_host: str = ""
     smtp_port: int = 587
     smtp_tls: bool = True

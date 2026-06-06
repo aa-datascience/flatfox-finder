@@ -127,8 +127,6 @@ Available models for this account (from /api/debug/models):
 - Flatfox API returns zipcode as int — normalised to str in flatfox_client.py
 - Flatfox listing status is normalised to "active" in _normalize() — matcher queries for status='active'
 
-## Debug endpoints (remove before going public)
-- `GET /api/debug/models` — lists available Anthropic models for the configured API key
 
 ## Don'ts
 - Don't scrape Flatfox HTML. Only use the official API.

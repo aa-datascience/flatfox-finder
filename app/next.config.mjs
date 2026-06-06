@@ -1,5 +1,6 @@
 /** @type {import('next').NextConfig} */
 const nextConfig = {
+  transpilePackages: ["franc", "@vitalets/google-translate-api"],
   images: {
     remotePatterns: [
       {

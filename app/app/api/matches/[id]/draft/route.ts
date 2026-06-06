@@ -1,4 +1,5 @@
 import Anthropic from "@anthropic-ai/sdk";
+import { franc } from "franc";
 import { NextRequest, NextResponse } from "next/server";
 
 import { getSessionUserId, unauthorized, forbidden } from "@/lib/auth";
@@ -19,6 +20,19 @@ const LOCALE_NAMES: Record<string, string> = {
   it: "Italian",
 };
 
+const FRANC_TO_ISO: Record<string, string> = {
+  deu: "de",
+  fra: "fr",
+  ita: "it",
+  eng: "en",
+};
+
+function detectLang(text: string): string | null {
+  const result = franc(text, { minLength: 20 });
+  if (result === "und") return null;
+  return FRANC_TO_ISO[result] ?? result;
+}
+
 function resolveMessageLanguage(
   preference: string,
   userLocale: string,
@@ -27,41 +41,14 @@ function resolveMessageLanguage(
   switch (preference) {
     case "english":
       return "English";
-    case "my_language": {
-      const userLang = LOCALE_NAMES[userLocale] ?? "English";
-      if (descriptionLang && LOCALE_NAMES[descriptionLang] === userLang) {
-        return userLang;
-      }
-      return userLang;
-    }
+    case "my_language":
+      return LOCALE_NAMES[userLocale] ?? "English";
     case "description":
     default:
       if (descriptionLang && LOCALE_NAMES[descriptionLang]) {
         return LOCALE_NAMES[descriptionLang];
       }
       return "the same language as the listing description";
-  }
-}
-
-async function detectDescriptionLanguage(
-  client: Anthropic,
-  description: string,
-): Promise<string | null> {
-  try {
-    const resp = await client.messages.create({
-      model: "claude-haiku-4-5-20251001",
-      max_tokens: 10,
-      messages: [
-        {
-          role: "user",
-          content: `What language is this text written in? Reply with ONLY the 2-letter ISO code (de, fr, it, en, etc). If bilingual, pick the primary one.\n\n${description.slice(0, 500)}`,
-        },
-      ],
-    });
-    const code = resp.content[0].type === "text" ? resp.content[0].text.trim().toLowerCase().slice(0, 2) : null;
-    return code;
-  } catch {
-    return null;
   }
 }
 
@@ -110,13 +97,8 @@ export async function POST(
   const sanitizedDescription = stripPii(match.listing.description ?? "");
   const sanitizedTitle = stripPii(match.listing.publicTitle ?? "");
 
-  const client = new Anthropic();
-
   const messagePref = profile.messageLanguage ?? "description";
-  let descriptionLang: string | null = null;
-  if (messagePref === "description" || messagePref === "my_language") {
-    descriptionLang = await detectDescriptionLanguage(client, sanitizedDescription);
-  }
+  const descriptionLang = detectLang(sanitizedDescription);
 
   const writeInLanguage = resolveMessageLanguage(
     messagePref,
@@ -140,6 +122,7 @@ export async function POST(
   });
 
   try {
+    const client = new Anthropic();
     const response = await client.messages.create({
       model: DRAFT_MODEL,
       max_tokens: 500,

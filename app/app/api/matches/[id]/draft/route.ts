@@ -119,6 +119,7 @@ export async function POST(
     moveInFrom: profile.moveInFrom?.toISOString().split("T")[0] ?? null,
     rationale: match.rationale ?? "",
     writeInLanguage,
+    aboutMe: profile.rawText ? stripPii(profile.rawText) : null,
   });
 
   try {

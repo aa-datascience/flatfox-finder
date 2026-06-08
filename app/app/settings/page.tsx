@@ -39,6 +39,7 @@ interface ProfileData {
   smoking_ok: boolean | null;
   gender_pref: string;
   message_language: string;
+  raw_text: string;
 }
 
 const EMPTY_PROFILE: ProfileData = {
@@ -57,6 +58,7 @@ const EMPTY_PROFILE: ProfileData = {
   smoking_ok: null,
   gender_pref: "",
   message_language: "description",
+  raw_text: "",
 };
 
 type Section = "profile" | "password" | "delete";
@@ -109,6 +111,7 @@ export default function SettingsPage() {
           smoking_ok: p.smokingOk ?? null,
           gender_pref: p.genderPref ?? "",
           message_language: p.messageLanguage ?? "description",
+          raw_text: p.rawText ?? "",
         });
       } finally {
         setProfileLoading(false);
@@ -151,6 +154,7 @@ export default function SettingsPage() {
           smoking_ok: profile.smoking_ok,
           gender_pref: profile.gender_pref || null,
           message_language: profile.message_language,
+          raw_text: profile.raw_text || null,
           input_mode: "form",
         }),
       });
@@ -263,6 +267,16 @@ export default function SettingsPage() {
                   value={profile.study_program}
                   onChange={(e) => setProfile({ ...profile, study_program: e.target.value })}
                   className="input"
+                />
+              </Field>
+
+              <Field label="About me (used to personalize contact messages)">
+                <textarea
+                  value={profile.raw_text}
+                  onChange={(e) => setProfile({ ...profile, raw_text: e.target.value })}
+                  className="input"
+                  rows={3}
+                  placeholder="E.g. I'm a tidy, quiet person who loves cooking. Non-smoker, early riser..."
                 />
               </Field>
 

@@ -21,11 +21,15 @@ export function buildDraftUserMessage(params: {
   moveInFrom: string | null;
   rationale: string;
   writeInLanguage: string;
+  aboutMe: string | null;
 }): string {
+  const aboutLine = params.aboutMe
+    ? `\nAbout the student: ${params.aboutMe}`
+    : "";
   return `Listing title: ${params.publicTitle}
 Listing description: ${params.description}
 Listing city: ${params.city}, rent: CHF ${params.rentGross ?? "unknown"}/mo, rooms: ${params.numberOfRooms ?? "unknown"}
-Student profile: {STUDENT_NAME}, studying {STUDENT_PROGRAM}, speaks ${params.studentLanguage}, budget CHF ${params.budgetMax ?? "unknown"}/mo, moving from ${params.moveInFrom ?? "flexible"}
+Student profile: {STUDENT_NAME}, studying {STUDENT_PROGRAM}, speaks ${params.studentLanguage}, budget CHF ${params.budgetMax ?? "unknown"}/mo, moving from ${params.moveInFrom ?? "flexible"}${aboutLine}
 Match rationale: ${params.rationale}
 
 IMPORTANT: Write the message in ${params.writeInLanguage}.`;

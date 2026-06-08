@@ -212,12 +212,13 @@ function computeMatch(
   rationale: string;
   listingSnapshot: Prisma.JsonObject;
 } | null {
-  // Compute effective gross rent
+  // Compute effective gross rent (treat 0 as missing)
   const effectiveGross =
-    listing.rentGross ??
-    (listing.rentNet != null
-      ? listing.rentNet + (listing.rentCharges ?? 0)
-      : null);
+    (listing.rentGross != null && listing.rentGross > 0)
+      ? listing.rentGross
+      : (listing.rentNet != null && listing.rentNet > 0)
+        ? listing.rentNet + (listing.rentCharges ?? 0)
+        : null;
 
   // Hard filter: exclude listings with no rent info
   if (effectiveGross == null) return null;

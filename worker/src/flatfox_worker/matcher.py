@@ -217,9 +217,9 @@ def layer2_score(profile: Profile, listing: ListingWithAttrs) -> tuple[float, li
 
 
 def compute_match(profile: Profile, listing: ListingWithAttrs) -> dict[str, Any] | None:
-    # Compute effective gross rent
-    effective_gross = listing.rent_gross
-    if effective_gross is None and listing.rent_net is not None:
+    # Compute effective gross rent (treat 0 as missing)
+    effective_gross = listing.rent_gross if listing.rent_gross and listing.rent_gross > 0 else None
+    if effective_gross is None and listing.rent_net is not None and listing.rent_net > 0:
         effective_gross = listing.rent_net + (listing.rent_charges or 0)
 
     # Hard filter: exclude listings with no rent info

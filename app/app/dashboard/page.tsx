@@ -221,8 +221,13 @@ function MatchCard({
     listing?.city ?? (snapshot.city as string) ?? "Unknown";
   const rentNet = listing?.rentNet ?? (snapshot.rent_net as number | null) ?? null;
   const rentCharges = listing?.rentCharges ?? (snapshot.rent_charges as number | null) ?? null;
+  const rawGross = listing?.rentGross ?? (snapshot.price as number | null) ?? null;
   const price =
-    listing?.rentGross ?? (snapshot.price as number) ?? null;
+    (rawGross != null && rawGross > 0)
+      ? rawGross
+      : (rentNet != null && rentNet > 0)
+        ? rentNet + (rentCharges ?? 0)
+        : null;
   const rooms = listing?.numberOfRooms ?? null;
   const isRemoved = listing?.status === "removed" || !listing;
   const scorePercent = Math.round(match.score * 100);

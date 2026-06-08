@@ -6,7 +6,7 @@ RUN npm ci
 
 COPY . .
 RUN npx prisma generate
-RUN npm run build
+RUN npx next build
 
 EXPOSE 3000
 ENV HOSTNAME="0.0.0.0"

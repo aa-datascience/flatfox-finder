@@ -1,6 +1,7 @@
 "use client";
 
 import { signOut, useSession } from "next-auth/react";
+import Image from "next/image";
 import Link from "next/link";
 import { usePathname } from "next/navigation";
 
@@ -19,21 +20,14 @@ export default function Header() {
     <header className="sticky top-0 z-50 border-b border-gray-200 bg-white/80 backdrop-blur-lg">
       <div className="mx-auto flex h-16 max-w-5xl items-center justify-between px-4">
         {/* Logo */}
-        <Link href="/dashboard" className="flex items-center gap-2.5">
-          <div className="flex h-8 w-8 items-center justify-center rounded-lg bg-brand-600 shadow-sm">
-            <svg
-              className="h-4.5 w-4.5 text-white"
-              viewBox="0 0 24 24"
-              fill="none"
-              stroke="currentColor"
-              strokeWidth="2.5"
-              strokeLinecap="round"
-              strokeLinejoin="round"
-            >
-              <path d="M3 9l9-7 9 7v11a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2z" />
-              <polyline points="9 22 9 12 15 12 15 22" />
-            </svg>
-          </div>
+        <Link href="/dashboard" className="flex items-center gap-2">
+          <Image
+            src="/logo.png"
+            alt="FlatfoxFinder"
+            width={36}
+            height={36}
+            className="h-9 w-9"
+          />
           <span className="text-lg font-semibold tracking-tight text-gray-900">
             Flatfox<span className="text-brand-600">Finder</span>
           </span>

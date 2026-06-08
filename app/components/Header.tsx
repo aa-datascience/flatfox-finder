@@ -1,7 +1,6 @@
 "use client";
 
 import { signOut, useSession } from "next-auth/react";
-import Image from "next/image";
 import Link from "next/link";
 import { usePathname } from "next/navigation";
 
@@ -21,12 +20,11 @@ export default function Header() {
       <div className="mx-auto flex h-16 max-w-5xl items-center justify-between px-4">
         {/* Logo */}
         <Link href="/dashboard" className="flex items-center gap-2">
-          <Image
+          {/* eslint-disable-next-line @next/next/no-img-element */}
+          <img
             src="/logo.png"
             alt="FlatfoxFinder"
-            width={36}
-            height={36}
-            className="h-9 w-9"
+            className="h-9 w-9 object-contain"
           />
           <span className="text-lg font-semibold tracking-tight text-gray-900">
             Flatfox<span className="text-brand-600">Finder</span>

@@ -1,7 +1,6 @@
 "use client";
 
 import { signOut, useSession } from "next-auth/react";
-import Link from "next/link";
 import { useEffect, useState } from "react";
 
 const CITY_OPTIONS = [
@@ -159,7 +158,7 @@ export default function SettingsPage() {
         }),
       });
       if (!res.ok) throw new Error();
-      setProfileMsg({ type: "ok", text: "Profile saved." });
+      setProfileMsg({ type: "ok", text: "Profile saved. Matches have been updated." });
     } catch {
       setProfileMsg({ type: "err", text: "Failed to save." });
     } finally {
@@ -209,7 +208,7 @@ export default function SettingsPage() {
 
   return (
     <main className="mx-auto max-w-2xl px-4 py-8">
-      <div className="mb-6">
+      <div className="mb-8">
         <h1 className="text-2xl font-bold text-gray-900">Settings</h1>
         <p className="text-sm text-gray-500 mt-1">
           Manage your profile, preferences, and account.
@@ -217,7 +216,7 @@ export default function SettingsPage() {
       </div>
 
       {/* Section tabs */}
-      <div className="flex gap-1 mb-6 border-b border-gray-200">
+      <div className="flex gap-1 mb-8">
         {([
           ["profile", "Profile"],
           ["password", "Password"],
@@ -226,10 +225,10 @@ export default function SettingsPage() {
           <button
             key={key}
             onClick={() => setSection(key)}
-            className={`px-4 py-2 text-sm font-medium border-b-2 -mb-px ${
+            className={`rounded-lg px-4 py-2 text-sm font-medium transition-colors ${
               section === key
-                ? "border-brand-600 text-brand-600"
-                : "border-transparent text-gray-500 hover:text-gray-700"
+                ? "bg-brand-600 text-white shadow-sm"
+                : "text-gray-600 hover:bg-gray-100"
             }`}
           >
             {label}
@@ -239,239 +238,248 @@ export default function SettingsPage() {
 
       {/* Profile section */}
       {section === "profile" && (
-        <div className="space-y-5">
+        <div className="space-y-6">
           {profileLoading ? (
-            <p className="text-gray-500">Loading…</p>
+            <div className="card p-6 text-center text-gray-500">Loading...</div>
           ) : (
             <>
-              <Field label="Name">
-                <input
-                  type="text"
-                  value={name}
-                  onChange={(e) => setName(e.target.value)}
-                  className="input"
-                />
-              </Field>
+              {/* Personal info card */}
+              <div className="card p-6">
+                <SectionTitle>Personal information</SectionTitle>
+                <div className="space-y-4">
+                  <Field label="Name">
+                    <input
+                      type="text"
+                      value={name}
+                      onChange={(e) => setName(e.target.value)}
+                      className="input"
+                    />
+                  </Field>
 
-              <Field label="Preferred language">
-                <select value={locale} onChange={(e) => setLocale(e.target.value)} className="input">
-                  {LOCALE_OPTIONS.map((o) => (
-                    <option key={o.value} value={o.value}>{o.label}</option>
-                  ))}
-                </select>
-              </Field>
-
-              <Field label="Study program">
-                <input
-                  type="text"
-                  value={profile.study_program}
-                  onChange={(e) => setProfile({ ...profile, study_program: e.target.value })}
-                  className="input"
-                />
-              </Field>
-
-              <Field label="About me (used to personalize contact messages)">
-                <textarea
-                  value={profile.raw_text}
-                  onChange={(e) => setProfile({ ...profile, raw_text: e.target.value })}
-                  className="input"
-                  rows={3}
-                  placeholder="E.g. I'm a tidy, quiet person who loves cooking. Non-smoker, early riser..."
-                />
-              </Field>
-
-              <Field label="Budget (max CHF/mo)">
-                <input
-                  type="number"
-                  value={profile.budget_max}
-                  onChange={(e) => setProfile({ ...profile, budget_max: e.target.value })}
-                  className="input"
-                  min={0}
-                />
-              </Field>
-
-              <Field label="Cities">
-                <div className="flex flex-wrap gap-2">
-                  {CITY_OPTIONS.map((c) => (
-                    <button
-                      key={c}
-                      type="button"
-                      onClick={() => toggleArray("cities", c)}
-                      className={`rounded-full border px-3 py-1 text-sm ${
-                        profile.cities.includes(c)
-                          ? "border-brand-600 bg-brand-50 text-brand-700"
-                          : "border-gray-300 text-gray-700 hover:bg-gray-50"
-                      }`}
-                    >
-                      {c}
-                    </button>
-                  ))}
-                </div>
-              </Field>
-
-              <Field label="Radius (km)">
-                <div className="flex items-center gap-3">
-                  <input
-                    type="range"
-                    min={1}
-                    max={50}
-                    value={profile.radius_km}
-                    onChange={(e) => setProfile({ ...profile, radius_km: e.target.value })}
-                    className="flex-1"
-                  />
-                  <span className="text-sm text-gray-500 w-12">{profile.radius_km} km</span>
-                </div>
-              </Field>
-
-              <Field label="Min rooms">
-                <input
-                  type="number"
-                  value={profile.rooms_min}
-                  onChange={(e) => setProfile({ ...profile, rooms_min: e.target.value })}
-                  className="input"
-                  min={1}
-                  max={10}
-                  step={0.5}
-                />
-              </Field>
-
-              <Field label="Move-in from">
-                <input
-                  type="date"
-                  value={profile.move_in_from}
-                  onChange={(e) => setProfile({ ...profile, move_in_from: e.target.value })}
-                  className="input"
-                />
-              </Field>
-
-              <Field label="Flexible on date?">
-                <Toggle
-                  checked={profile.move_in_flexible}
-                  onChange={(v) => setProfile({ ...profile, move_in_flexible: v })}
-                />
-              </Field>
-
-              <Field label="Furnished?">
-                <TriToggle
-                  value={profile.furnished_pref}
-                  onChange={(v) => setProfile({ ...profile, furnished_pref: v })}
-                />
-              </Field>
-
-              <Field label="Max flatmates">
-                <input
-                  type="number"
-                  value={profile.max_flatmates}
-                  onChange={(e) => setProfile({ ...profile, max_flatmates: e.target.value })}
-                  className="input"
-                  min={0}
-                />
-              </Field>
-
-              <Field label="Languages">
-                <div className="flex flex-wrap gap-2">
-                  {LANGUAGE_OPTIONS.map((l) => (
-                    <button
-                      key={l}
-                      type="button"
-                      onClick={() => toggleArray("languages", l)}
-                      className={`rounded-full border px-3 py-1 text-sm ${
-                        profile.languages.includes(l)
-                          ? "border-brand-600 bg-brand-50 text-brand-700"
-                          : "border-gray-300 text-gray-700 hover:bg-gray-50"
-                      }`}
-                    >
-                      {l}
-                    </button>
-                  ))}
-                </div>
-              </Field>
-
-              <Field label="Vibe">
-                <div className="flex gap-2">
-                  {VIBE_OPTIONS.map((v) => (
-                    <button
-                      key={v}
-                      type="button"
-                      onClick={() => setProfile({ ...profile, vibe: profile.vibe === v ? "" : v })}
-                      className={`rounded-full border px-3 py-1 text-sm capitalize ${
-                        profile.vibe === v
-                          ? "border-brand-600 bg-brand-50 text-brand-700"
-                          : "border-gray-300 text-gray-700 hover:bg-gray-50"
-                      }`}
-                    >
-                      {v}
-                    </button>
-                  ))}
-                </div>
-              </Field>
-
-              <Field label="Pets OK?">
-                <TriToggle
-                  value={profile.pets_ok}
-                  onChange={(v) => setProfile({ ...profile, pets_ok: v })}
-                />
-              </Field>
-
-              <Field label="Smoking OK?">
-                <TriToggle
-                  value={profile.smoking_ok}
-                  onChange={(v) => setProfile({ ...profile, smoking_ok: v })}
-                />
-              </Field>
-
-              <Field label="Gender preference">
-                <div className="flex gap-2">
-                  {GENDER_PREF_OPTIONS.map((g) => (
-                    <button
-                      key={g}
-                      type="button"
-                      onClick={() =>
-                        setProfile({ ...profile, gender_pref: profile.gender_pref === g ? "" : g })
-                      }
-                      className={`rounded-full border px-3 py-1 text-sm ${
-                        profile.gender_pref === g
-                          ? "border-brand-600 bg-brand-50 text-brand-700"
-                          : "border-gray-300 text-gray-700 hover:bg-gray-50"
-                      }`}
-                    >
-                      {g === "any" ? "Any" : g === "female_only" ? "Female only" : "Male only"}
-                    </button>
-                  ))}
-                </div>
-              </Field>
-
-              <Field label="Contact message language">
-                <div className="flex flex-col gap-2">
-                  {MESSAGE_LANG_OPTIONS.map((o) => (
-                    <label key={o.value} className="flex items-center gap-2 text-sm">
+                  <div className="grid grid-cols-2 gap-4">
+                    <Field label="Preferred language">
+                      <select value={locale} onChange={(e) => setLocale(e.target.value)} className="input">
+                        {LOCALE_OPTIONS.map((o) => (
+                          <option key={o.value} value={o.value}>{o.label}</option>
+                        ))}
+                      </select>
+                    </Field>
+                    <Field label="Study program">
                       <input
-                        type="radio"
-                        name="message_language"
-                        value={o.value}
-                        checked={profile.message_language === o.value}
-                        onChange={() => setProfile({ ...profile, message_language: o.value })}
-                        className="accent-brand-600"
+                        type="text"
+                        value={profile.study_program}
+                        onChange={(e) => setProfile({ ...profile, study_program: e.target.value })}
+                        className="input"
                       />
-                      {o.label}
-                    </label>
-                  ))}
+                    </Field>
+                  </div>
+
+                  <Field label="About me">
+                    <textarea
+                      value={profile.raw_text}
+                      onChange={(e) => setProfile({ ...profile, raw_text: e.target.value })}
+                      className="input"
+                      rows={3}
+                      placeholder="Used to personalize your contact messages. E.g. I'm a tidy, quiet person who loves cooking..."
+                    />
+                    <p className="text-xs text-gray-400 mt-1">This text is included when AI drafts your messages.</p>
+                  </Field>
                 </div>
-              </Field>
+              </div>
 
-              {profileMsg && (
-                <p className={`text-sm ${profileMsg.type === "ok" ? "text-green-600" : "text-red-600"}`}>
-                  {profileMsg.text}
-                </p>
-              )}
+              {/* Search criteria card */}
+              <div className="card p-6">
+                <SectionTitle>Search criteria</SectionTitle>
+                <div className="space-y-4">
+                  <div className="grid grid-cols-2 gap-4">
+                    <Field label="Budget (max CHF/mo)">
+                      <input
+                        type="number"
+                        value={profile.budget_max}
+                        onChange={(e) => setProfile({ ...profile, budget_max: e.target.value })}
+                        className="input"
+                        min={0}
+                      />
+                    </Field>
+                    <Field label="Min rooms">
+                      <input
+                        type="number"
+                        value={profile.rooms_min}
+                        onChange={(e) => setProfile({ ...profile, rooms_min: e.target.value })}
+                        className="input"
+                        min={1}
+                        max={10}
+                        step={0.5}
+                      />
+                    </Field>
+                  </div>
 
-              <button
-                onClick={handleSaveProfile}
-                disabled={profileSaving}
-                className="rounded-md bg-brand-600 px-4 py-2 text-sm font-medium text-white hover:bg-brand-700 disabled:opacity-50"
-              >
-                {profileSaving ? "Saving…" : "Save profile"}
-              </button>
+                  <Field label="Cities">
+                    <div className="flex flex-wrap gap-2">
+                      {CITY_OPTIONS.map((c) => (
+                        <Chip
+                          key={c}
+                          label={c}
+                          active={profile.cities.includes(c)}
+                          onClick={() => toggleArray("cities", c)}
+                        />
+                      ))}
+                    </div>
+                  </Field>
+
+                  <Field label="Radius (km)">
+                    <div className="flex items-center gap-3">
+                      <input
+                        type="range"
+                        min={1}
+                        max={50}
+                        value={profile.radius_km}
+                        onChange={(e) => setProfile({ ...profile, radius_km: e.target.value })}
+                        className="flex-1 accent-brand-600"
+                      />
+                      <span className="text-sm font-medium text-gray-700 bg-gray-100 rounded-md px-2.5 py-1 min-w-[3.5rem] text-center">
+                        {profile.radius_km} km
+                      </span>
+                    </div>
+                  </Field>
+
+                  <div className="grid grid-cols-2 gap-4">
+                    <Field label="Move-in from">
+                      <input
+                        type="date"
+                        value={profile.move_in_from}
+                        onChange={(e) => setProfile({ ...profile, move_in_from: e.target.value })}
+                        className="input"
+                      />
+                    </Field>
+                    <Field label="Flexible on date?">
+                      <div className="pt-1.5">
+                        <Toggle
+                          checked={profile.move_in_flexible}
+                          onChange={(v) => setProfile({ ...profile, move_in_flexible: v })}
+                        />
+                      </div>
+                    </Field>
+                  </div>
+
+                  <div className="grid grid-cols-2 gap-4">
+                    <Field label="Furnished?">
+                      <TriToggle
+                        value={profile.furnished_pref}
+                        onChange={(v) => setProfile({ ...profile, furnished_pref: v })}
+                      />
+                    </Field>
+                    <Field label="Max flatmates">
+                      <input
+                        type="number"
+                        value={profile.max_flatmates}
+                        onChange={(e) => setProfile({ ...profile, max_flatmates: e.target.value })}
+                        className="input"
+                        min={0}
+                      />
+                    </Field>
+                  </div>
+                </div>
+              </div>
+
+              {/* Preferences card */}
+              <div className="card p-6">
+                <SectionTitle>Living preferences</SectionTitle>
+                <div className="space-y-4">
+                  <Field label="Languages spoken">
+                    <div className="flex flex-wrap gap-2">
+                      {LANGUAGE_OPTIONS.map((l) => (
+                        <Chip
+                          key={l}
+                          label={l}
+                          active={profile.languages.includes(l)}
+                          onClick={() => toggleArray("languages", l)}
+                        />
+                      ))}
+                    </div>
+                  </Field>
+
+                  <Field label="Vibe">
+                    <div className="flex gap-2">
+                      {VIBE_OPTIONS.map((v) => (
+                        <Chip
+                          key={v}
+                          label={v.charAt(0).toUpperCase() + v.slice(1)}
+                          active={profile.vibe === v}
+                          onClick={() => setProfile({ ...profile, vibe: profile.vibe === v ? "" : v })}
+                        />
+                      ))}
+                    </div>
+                  </Field>
+
+                  <div className="grid grid-cols-3 gap-4">
+                    <Field label="Pets OK?">
+                      <TriToggle
+                        value={profile.pets_ok}
+                        onChange={(v) => setProfile({ ...profile, pets_ok: v })}
+                      />
+                    </Field>
+                    <Field label="Smoking OK?">
+                      <TriToggle
+                        value={profile.smoking_ok}
+                        onChange={(v) => setProfile({ ...profile, smoking_ok: v })}
+                      />
+                    </Field>
+                    <Field label="Gender pref.">
+                      <div className="flex flex-wrap gap-1.5">
+                        {GENDER_PREF_OPTIONS.map((g) => (
+                          <Chip
+                            key={g}
+                            label={g === "any" ? "Any" : g === "female_only" ? "F" : "M"}
+                            active={profile.gender_pref === g}
+                            onClick={() =>
+                              setProfile({ ...profile, gender_pref: profile.gender_pref === g ? "" : g })
+                            }
+                          />
+                        ))}
+                      </div>
+                    </Field>
+                  </div>
+                </div>
+              </div>
+
+              {/* Message settings card */}
+              <div className="card p-6">
+                <SectionTitle>Message settings</SectionTitle>
+                <Field label="Contact message language">
+                  <div className="flex flex-col gap-2.5">
+                    {MESSAGE_LANG_OPTIONS.map((o) => (
+                      <label key={o.value} className="flex items-center gap-2.5 text-sm cursor-pointer">
+                        <input
+                          type="radio"
+                          name="message_language"
+                          value={o.value}
+                          checked={profile.message_language === o.value}
+                          onChange={() => setProfile({ ...profile, message_language: o.value })}
+                          className="accent-brand-600"
+                        />
+                        <span className="text-gray-700">{o.label}</span>
+                      </label>
+                    ))}
+                  </div>
+                </Field>
+              </div>
+
+              {/* Save button */}
+              <div className="flex items-center gap-4">
+                <button
+                  onClick={handleSaveProfile}
+                  disabled={profileSaving}
+                  className="btn-primary"
+                >
+                  {profileSaving ? "Saving..." : "Save profile"}
+                </button>
+                {profileMsg && (
+                  <p className={`text-sm ${profileMsg.type === "ok" ? "text-green-600" : "text-red-600"}`}>
+                    {profileMsg.text}
+                  </p>
+                )}
+              </div>
             </>
           )}
         </div>
@@ -479,76 +487,76 @@ export default function SettingsPage() {
 
       {/* Password section */}
       {section === "password" && (
-        <form onSubmit={handleChangePassword} className="space-y-4 max-w-sm">
-          <Field label="Current password">
-            <input
-              type="password"
-              value={oldPassword}
-              onChange={(e) => setOldPassword(e.target.value)}
-              className="input"
-              required
-            />
-          </Field>
-          <Field label="New password">
-            <input
-              type="password"
-              value={newPassword}
-              onChange={(e) => setNewPassword(e.target.value)}
-              className="input"
-              minLength={8}
-              required
-            />
-          </Field>
+        <div className="card p-6 max-w-md">
+          <SectionTitle>Change password</SectionTitle>
+          <form onSubmit={handleChangePassword} className="space-y-4">
+            <Field label="Current password">
+              <input
+                type="password"
+                value={oldPassword}
+                onChange={(e) => setOldPassword(e.target.value)}
+                className="input"
+                required
+              />
+            </Field>
+            <Field label="New password">
+              <input
+                type="password"
+                value={newPassword}
+                onChange={(e) => setNewPassword(e.target.value)}
+                className="input"
+                minLength={8}
+                required
+              />
+              <p className="text-xs text-gray-400 mt-1">Minimum 8 characters.</p>
+            </Field>
 
-          {pwMsg && (
-            <p className={`text-sm ${pwMsg.type === "ok" ? "text-green-600" : "text-red-600"}`}>
-              {pwMsg.text}
-            </p>
-          )}
+            {pwMsg && (
+              <p className={`text-sm ${pwMsg.type === "ok" ? "text-green-600" : "text-red-600"}`}>
+                {pwMsg.text}
+              </p>
+            )}
 
-          <button
-            type="submit"
-            disabled={pwSaving}
-            className="rounded-md bg-brand-600 px-4 py-2 text-sm font-medium text-white hover:bg-brand-700 disabled:opacity-50"
-          >
-            {pwSaving ? "Changing…" : "Change password"}
-          </button>
-        </form>
+            <button type="submit" disabled={pwSaving} className="btn-primary">
+              {pwSaving ? "Changing..." : "Change password"}
+            </button>
+          </form>
+        </div>
       )}
 
       {/* Delete account section */}
       {section === "delete" && (
-        <div className="max-w-sm">
-          <div className="rounded-lg border border-red-200 bg-red-50 p-6">
-            <h2 className="font-medium text-red-800 mb-2">Delete account</h2>
+        <div className="space-y-6 max-w-md">
+          <div className="rounded-xl border border-red-200 bg-red-50 p-6">
+            <h2 className="font-semibold text-red-800 mb-2">Danger zone</h2>
             <p className="text-sm text-red-700 mb-4">
-              This permanently deletes your account, profile, matches, and messages.
+              Permanently delete your account, profile, matches, and messages.
               This action cannot be undone.
             </p>
 
             {!deleteConfirm ? (
               <button
                 onClick={() => setDeleteConfirm(true)}
-                className="rounded-md border border-red-300 px-4 py-2 text-sm font-medium text-red-700 hover:bg-red-100"
+                className="rounded-lg border border-red-300 px-4 py-2 text-sm font-medium text-red-700 hover:bg-red-100 transition-colors"
               >
-                I want to delete my account
+                Delete my account
               </button>
             ) : (
               <div className="space-y-3">
                 <p className="text-sm font-medium text-red-800">
-                  Are you sure? This cannot be undone.
+                  Are you absolutely sure?
                 </p>
                 <div className="flex gap-3">
                   <button
                     onClick={handleDeleteAccount}
                     disabled={deleting}
-                    className="rounded-md bg-red-600 px-4 py-2 text-sm font-medium text-white hover:bg-red-700 disabled:opacity-50"
+                    className="rounded-lg bg-red-600 px-4 py-2 text-sm font-medium text-white hover:bg-red-700 disabled:opacity-50 transition-colors"
                   >
-                    {deleting ? "Deleting…" : "Yes, delete everything"}
+                    {deleting ? "Deleting..." : "Yes, delete everything"}
                   </button>
                   <button
                     onClick={() => setDeleteConfirm(false)}
-                    className="rounded-md border border-gray-300 px-4 py-2 text-sm text-gray-700 hover:bg-gray-50"
+                    className="btn-secondary"
                   >
                     Cancel
                   </button>
@@ -557,12 +565,12 @@ export default function SettingsPage() {
             )}
           </div>
 
-          <div className="mt-6">
+          <div>
             <button
               onClick={() => signOut({ callbackUrl: "/" })}
-              className="text-sm text-gray-500 hover:text-gray-700"
+              className="text-sm text-gray-500 hover:text-gray-700 transition-colors"
             >
-              Log out
+              Log out of this device
             </button>
           </div>
         </div>
@@ -571,12 +579,38 @@ export default function SettingsPage() {
   );
 }
 
+/* --- Sub-components --- */
+
+function SectionTitle({ children }: { children: React.ReactNode }) {
+  return (
+    <h2 className="text-sm font-semibold text-gray-900 uppercase tracking-wide mb-4">
+      {children}
+    </h2>
+  );
+}
+
 function Field({ label, children }: { label: string; children: React.ReactNode }) {
   return (
     <div>
-      <label className="mb-1.5 block text-sm font-medium text-gray-700">{label}</label>
+      <label className="mb-1.5 block text-sm font-medium text-gray-600">{label}</label>
       {children}
     </div>
+  );
+}
+
+function Chip({ label, active, onClick }: { label: string; active: boolean; onClick: () => void }) {
+  return (
+    <button
+      type="button"
+      onClick={onClick}
+      className={`rounded-lg border px-3 py-1.5 text-sm font-medium transition-all ${
+        active
+          ? "border-brand-500 bg-brand-50 text-brand-700 shadow-sm"
+          : "border-gray-200 text-gray-600 hover:border-gray-300 hover:bg-gray-50"
+      }`}
+    >
+      {label}
+    </button>
   );
 }
 
@@ -590,7 +624,7 @@ function Toggle({ checked, onChange }: { checked: boolean; onChange: (v: boolean
       }`}
     >
       <span
-        className={`inline-block h-4 w-4 transform rounded-full bg-white transition-transform ${
+        className={`inline-block h-4 w-4 transform rounded-full bg-white shadow transition-transform ${
           checked ? "translate-x-6" : "translate-x-1"
         }`}
       />
@@ -606,25 +640,19 @@ function TriToggle({
   onChange: (v: boolean | null) => void;
 }) {
   const options: Array<{ val: boolean | null; label: string }> = [
-    { val: null, label: "No preference" },
+    { val: null, label: "Any" },
     { val: true, label: "Yes" },
     { val: false, label: "No" },
   ];
   return (
-    <div className="flex gap-2">
+    <div className="flex gap-1.5">
       {options.map((opt) => (
-        <button
+        <Chip
           key={opt.label}
-          type="button"
+          label={opt.label}
+          active={value === opt.val}
           onClick={() => onChange(opt.val)}
-          className={`rounded-full border px-3 py-1 text-sm ${
-            value === opt.val
-              ? "border-brand-600 bg-brand-50 text-brand-700"
-              : "border-gray-300 text-gray-700 hover:bg-gray-50"
-          }`}
-        >
-          {opt.label}
-        </button>
+        />
       ))}
     </div>
   );

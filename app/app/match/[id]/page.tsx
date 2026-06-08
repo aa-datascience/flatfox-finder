@@ -187,7 +187,7 @@ export default function MatchDetailPage() {
     return (
       <div className="flex min-h-screen flex-col items-center justify-center gap-3">
         <p className="text-gray-700">{error ?? "Something went wrong."}</p>
-        <Link href="/dashboard" className="text-sm text-blue-600 hover:underline">
+        <Link href="/dashboard" className="text-sm text-brand-600 hover:underline">
           Back to dashboard
         </Link>
       </div>
@@ -336,7 +336,7 @@ export default function MatchDetailPage() {
                 {translatedDesc && (
                   <button
                     onClick={() => setShowOriginal(!showOriginal)}
-                    className="text-xs text-blue-600 hover:underline"
+                    className="text-xs text-brand-600 hover:underline"
                   >
                     {showOriginal ? "Show translation" : "Show original"}
                   </button>
@@ -389,7 +389,7 @@ export default function MatchDetailPage() {
               <button
                 onClick={handleGenerateDraft}
                 disabled={drafting}
-                className="rounded-md bg-blue-600 px-4 py-2 text-sm font-medium text-white hover:bg-blue-700 disabled:opacity-50"
+                className="rounded-md btn-primary disabled:opacity-50"
               >
                 {drafting ? "Drafting…" : "Generate message draft"}
               </button>
@@ -408,7 +408,7 @@ export default function MatchDetailPage() {
               <div className="flex items-center gap-3">
                 <button
                   onClick={handleCopyAndOpen}
-                  className="rounded-md bg-blue-600 px-4 py-2 text-sm font-medium text-white hover:bg-blue-700"
+                  className="rounded-md btn-primary"
                 >
                   {copied ? "Copied!" : "Copy & Open on Flatfox"}
                 </button>
@@ -447,7 +447,7 @@ export default function MatchDetailPage() {
             href={`https://flatfox.ch${listing.url}`}
             target="_blank"
             rel="noopener noreferrer"
-            className="text-sm text-blue-600 hover:underline"
+            className="text-sm text-brand-600 hover:underline"
           >
             View on Flatfox
           </a>

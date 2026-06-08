@@ -228,7 +228,7 @@ export default function SettingsPage() {
             onClick={() => setSection(key)}
             className={`px-4 py-2 text-sm font-medium border-b-2 -mb-px ${
               section === key
-                ? "border-blue-600 text-blue-600"
+                ? "border-brand-600 text-brand-600"
                 : "border-transparent text-gray-500 hover:text-gray-700"
             }`}
           >
@@ -299,7 +299,7 @@ export default function SettingsPage() {
                       onClick={() => toggleArray("cities", c)}
                       className={`rounded-full border px-3 py-1 text-sm ${
                         profile.cities.includes(c)
-                          ? "border-blue-600 bg-blue-50 text-blue-700"
+                          ? "border-brand-600 bg-brand-50 text-brand-700"
                           : "border-gray-300 text-gray-700 hover:bg-gray-50"
                       }`}
                     >
@@ -377,7 +377,7 @@ export default function SettingsPage() {
                       onClick={() => toggleArray("languages", l)}
                       className={`rounded-full border px-3 py-1 text-sm ${
                         profile.languages.includes(l)
-                          ? "border-blue-600 bg-blue-50 text-blue-700"
+                          ? "border-brand-600 bg-brand-50 text-brand-700"
                           : "border-gray-300 text-gray-700 hover:bg-gray-50"
                       }`}
                     >
@@ -396,7 +396,7 @@ export default function SettingsPage() {
                       onClick={() => setProfile({ ...profile, vibe: profile.vibe === v ? "" : v })}
                       className={`rounded-full border px-3 py-1 text-sm capitalize ${
                         profile.vibe === v
-                          ? "border-blue-600 bg-blue-50 text-blue-700"
+                          ? "border-brand-600 bg-brand-50 text-brand-700"
                           : "border-gray-300 text-gray-700 hover:bg-gray-50"
                       }`}
                     >
@@ -431,7 +431,7 @@ export default function SettingsPage() {
                       }
                       className={`rounded-full border px-3 py-1 text-sm ${
                         profile.gender_pref === g
-                          ? "border-blue-600 bg-blue-50 text-blue-700"
+                          ? "border-brand-600 bg-brand-50 text-brand-700"
                           : "border-gray-300 text-gray-700 hover:bg-gray-50"
                       }`}
                     >
@@ -451,7 +451,7 @@ export default function SettingsPage() {
                         value={o.value}
                         checked={profile.message_language === o.value}
                         onChange={() => setProfile({ ...profile, message_language: o.value })}
-                        className="accent-blue-600"
+                        className="accent-brand-600"
                       />
                       {o.label}
                     </label>
@@ -468,7 +468,7 @@ export default function SettingsPage() {
               <button
                 onClick={handleSaveProfile}
                 disabled={profileSaving}
-                className="rounded-md bg-blue-600 px-4 py-2 text-sm font-medium text-white hover:bg-blue-700 disabled:opacity-50"
+                className="rounded-md bg-brand-600 px-4 py-2 text-sm font-medium text-white hover:bg-brand-700 disabled:opacity-50"
               >
                 {profileSaving ? "Saving…" : "Save profile"}
               </button>
@@ -509,7 +509,7 @@ export default function SettingsPage() {
           <button
             type="submit"
             disabled={pwSaving}
-            className="rounded-md bg-blue-600 px-4 py-2 text-sm font-medium text-white hover:bg-blue-700 disabled:opacity-50"
+            className="rounded-md bg-brand-600 px-4 py-2 text-sm font-medium text-white hover:bg-brand-700 disabled:opacity-50"
           >
             {pwSaving ? "Changing…" : "Change password"}
           </button>
@@ -586,7 +586,7 @@ function Toggle({ checked, onChange }: { checked: boolean; onChange: (v: boolean
       type="button"
       onClick={() => onChange(!checked)}
       className={`relative inline-flex h-6 w-11 items-center rounded-full transition-colors ${
-        checked ? "bg-blue-600" : "bg-gray-300"
+        checked ? "bg-brand-600" : "bg-gray-300"
       }`}
     >
       <span
@@ -619,7 +619,7 @@ function TriToggle({
           onClick={() => onChange(opt.val)}
           className={`rounded-full border px-3 py-1 text-sm ${
             value === opt.val
-              ? "border-blue-600 bg-blue-50 text-blue-700"
+              ? "border-brand-600 bg-brand-50 text-brand-700"
               : "border-gray-300 text-gray-700 hover:bg-gray-50"
           }`}
         >

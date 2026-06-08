@@ -82,7 +82,7 @@ function LoginForm() {
           <button
             type="submit"
             disabled={loading}
-            className="w-full rounded-md bg-blue-600 px-4 py-2.5 text-sm font-medium text-white hover:bg-blue-700 disabled:opacity-50"
+            className="w-full rounded-md bg-brand-600 px-4 py-2.5 text-sm font-medium text-white hover:bg-brand-700 disabled:opacity-50"
           >
             {loading ? "Logging in…" : "Log in"}
           </button>
@@ -90,7 +90,7 @@ function LoginForm() {
 
         <p className="text-center text-sm text-gray-600">
           Don&apos;t have an account?{" "}
-          <Link href="/signup" className="text-blue-600 hover:underline">
+          <Link href="/signup" className="text-brand-600 hover:underline">
             Sign up
           </Link>
         </p>

@@ -137,7 +137,7 @@ export default function SignupPage() {
             />
             <label htmlFor="consent" className="text-sm text-gray-600">
               I agree to the processing of my data as described in the{" "}
-              <a href="/privacy" target="_blank" className="text-blue-600 hover:underline">
+              <a href="/privacy" target="_blank" className="text-brand-600 hover:underline">
                 privacy policy
               </a>.
             </label>
@@ -148,7 +148,7 @@ export default function SignupPage() {
           <button
             type="submit"
             disabled={loading}
-            className="w-full rounded-md bg-blue-600 px-4 py-2.5 text-sm font-medium text-white hover:bg-blue-700 disabled:opacity-50"
+            className="w-full rounded-md bg-brand-600 px-4 py-2.5 text-sm font-medium text-white hover:bg-brand-700 disabled:opacity-50"
           >
             {loading ? "Creating account…" : "Create account"}
           </button>
@@ -156,7 +156,7 @@ export default function SignupPage() {
 
         <p className="text-center text-sm text-gray-600">
           Already have an account?{" "}
-          <Link href="/login" className="text-blue-600 hover:underline">
+          <Link href="/login" className="text-brand-600 hover:underline">
             Log in
           </Link>
         </p>

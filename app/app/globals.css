@@ -23,6 +23,14 @@
       disabled:opacity-50 disabled:cursor-not-allowed;
   }
 
+  .btn-accent {
+    @apply inline-flex items-center justify-center rounded-lg bg-accent-500 px-4 py-2
+      text-sm font-medium text-white shadow-sm transition-all
+      hover:bg-accent-600 hover:shadow-md
+      focus:outline-none focus:ring-2 focus:ring-accent-400/30
+      disabled:opacity-50 disabled:cursor-not-allowed;
+  }
+
   .btn-secondary {
     @apply inline-flex items-center justify-center rounded-lg border border-gray-300
       bg-white px-4 py-2 text-sm font-medium text-gray-700 shadow-sm transition-all
@@ -32,5 +40,22 @@
 
   .card {
     @apply rounded-xl border border-gray-200 bg-white shadow-sm;
+  }
+
+  .badge-new {
+    @apply inline-flex items-center rounded-full bg-accent-100 px-2 py-0.5
+      text-xs font-medium text-accent-700;
+  }
+
+  .badge-score-high {
+    @apply rounded-full bg-brand-100 px-2.5 py-1 text-sm font-semibold text-brand-700;
+  }
+
+  .badge-score-mid {
+    @apply rounded-full bg-accent-100 px-2.5 py-1 text-sm font-semibold text-accent-700;
+  }
+
+  .badge-score-low {
+    @apply rounded-full bg-gray-100 px-2.5 py-1 text-sm font-semibold text-gray-600;
   }
 }

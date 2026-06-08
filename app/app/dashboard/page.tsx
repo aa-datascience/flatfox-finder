@@ -118,10 +118,10 @@ export default function DashboardPage() {
               setFilter(f.value);
               setPage(1);
             }}
-            className={`rounded-full border px-3 py-1 text-sm ${
+            className={`rounded-full border px-3 py-1 text-sm transition-colors ${
               filter === f.value
-                ? "border-blue-600 bg-blue-50 text-blue-700"
-                : "border-gray-300 text-gray-700 hover:bg-gray-50"
+                ? "border-brand-600 bg-brand-50 text-brand-700"
+                : "border-gray-300 text-gray-700 hover:bg-gray-100"
             }`}
           >
             {f.label}
@@ -137,7 +137,7 @@ export default function DashboardPage() {
           <p className="text-red-600 mb-3">{error}</p>
           <button
             onClick={fetchMatches}
-            className="text-sm text-blue-600 hover:underline"
+            className="text-sm text-brand-600 hover:underline"
           >
             Retry
           </button>
@@ -230,16 +230,14 @@ function MatchCard({
   return (
     <Link
       href={`/match/${match.id}`}
-      className="block rounded-lg border border-gray-200 bg-white p-4 hover:border-blue-300 hover:shadow-sm transition-all"
+      className="block rounded-lg border border-gray-200 bg-white p-4 hover:border-brand-300 hover:shadow-sm transition-all"
     >
       <div className="flex items-start justify-between gap-4">
         <div className="flex-1 min-w-0">
           <div className="flex items-center gap-2 mb-1">
             <h3 className="font-medium text-gray-900 truncate">{title}</h3>
             {match.status === "new" && (
-              <span className="inline-flex items-center rounded-full bg-blue-100 px-2 py-0.5 text-xs font-medium text-blue-700">
-                New
-              </span>
+              <span className="badge-new">New</span>
             )}
             {isRemoved && (
               <span className="inline-flex items-center rounded-full bg-gray-100 px-2 py-0.5 text-xs text-gray-500">
@@ -284,13 +282,12 @@ function MatchCard({
 
         <div className="flex flex-col items-end gap-2 shrink-0">
           <div
-            className={`rounded-full px-2.5 py-1 text-sm font-semibold ${
-              scorePercent >= 80
-                ? "bg-green-100 text-green-700"
-                : scorePercent >= 60
-                  ? "bg-yellow-100 text-yellow-700"
-                  : "bg-gray-100 text-gray-600"
-            }`}
+            className={scorePercent >= 80
+              ? "badge-score-high"
+              : scorePercent >= 60
+                ? "badge-score-mid"
+                : "badge-score-low"
+            }
           >
             {scorePercent}%
           </div>

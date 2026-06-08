@@ -227,59 +227,76 @@ function MatchCard({
   const isRemoved = listing?.status === "removed" || !listing;
   const scorePercent = Math.round(match.score * 100);
 
+  const borderColor =
+    scorePercent >= 80
+      ? "border-l-brand-500"
+      : scorePercent >= 60
+        ? "border-l-accent-400"
+        : "border-l-gray-300";
+
   return (
     <Link
       href={`/match/${match.id}`}
-      className="block rounded-lg border border-gray-200 bg-white p-4 hover:border-brand-300 hover:shadow-sm transition-all"
+      className={`block rounded-xl border border-gray-200 border-l-4 ${borderColor} bg-white p-5 transition-all hover:shadow-md hover:-translate-y-0.5`}
     >
       <div className="flex items-start justify-between gap-4">
         <div className="flex-1 min-w-0">
-          <div className="flex items-center gap-2 mb-1">
-            <h3 className="font-medium text-gray-900 truncate">{title}</h3>
+          {/* Title row */}
+          <div className="flex items-center gap-2 mb-2">
+            <h3 className="font-semibold text-gray-900 truncate">{title}</h3>
             {match.status === "new" && (
               <span className="badge-new">New</span>
             )}
             {isRemoved && (
               <span className="inline-flex items-center rounded-full bg-gray-100 px-2 py-0.5 text-xs text-gray-500">
-                No longer available
+                Unavailable
               </span>
             )}
             {listing?.reserved && (
-              <span className="inline-flex items-center rounded-full bg-yellow-100 px-2 py-0.5 text-xs text-yellow-700">
+              <span className="inline-flex items-center rounded-full bg-amber-50 px-2 py-0.5 text-xs text-amber-700 border border-amber-200">
                 Reserved
               </span>
             )}
           </div>
 
-          <div className="flex items-center gap-3 text-sm text-gray-500">
-            <span>{city}</span>
+          {/* Info chips */}
+          <div className="flex flex-wrap items-center gap-2 mb-2">
+            <span className="inline-flex items-center gap-1 rounded-md bg-gray-100 px-2 py-1 text-xs font-medium text-gray-700">
+              <svg className="h-3 w-3 text-gray-400" viewBox="0 0 20 20" fill="currentColor"><path fillRule="evenodd" d="M5.05 4.05a7 7 0 119.9 9.9L10 18.9l-4.95-4.95a7 7 0 010-9.9zM10 11a2 2 0 100-4 2 2 0 000 4z" clipRule="evenodd" /></svg>
+              {city}
+            </span>
             {price != null && (
-              <span>
+              <span className="inline-flex items-center gap-1 rounded-md bg-brand-50 px-2 py-1 text-xs font-medium text-brand-700">
+                <svg className="h-3 w-3 text-brand-400" viewBox="0 0 20 20" fill="currentColor"><path d="M8.433 7.418c.155-.103.346-.196.567-.267v1.698a2.305 2.305 0 01-.567-.267C8.07 8.34 8 8.114 8 8c0-.114.07-.34.433-.582zM11 12.849v-1.698c.22.071.412.164.567.267.364.243.433.468.433.582 0 .114-.07.34-.433.582a2.305 2.305 0 01-.567.267z" /><path fillRule="evenodd" d="M10 18a8 8 0 100-16 8 8 0 000 16zm1-13a1 1 0 10-2 0v.092a4.535 4.535 0 00-1.676.662C6.602 6.234 6 7.009 6 8c0 .99.602 1.765 1.324 2.246.48.32 1.054.545 1.676.662v1.941c-.391-.127-.68-.317-.843-.504a1 1 0 10-1.51 1.31c.562.649 1.413 1.076 2.353 1.253V15a1 1 0 102 0v-.092a4.535 4.535 0 001.676-.662C13.398 13.766 14 12.991 14 12c0-.99-.602-1.765-1.324-2.246A4.535 4.535 0 0011 9.092V7.151c.391.127.68.317.843.504a1 1 0 101.511-1.31c-.563-.649-1.413-1.076-2.354-1.253V5z" clipRule="evenodd" /></svg>
                 CHF {price}/mo
                 {rentNet != null && rentCharges != null && (
-                  <span className="text-gray-400 ml-1">
-                    ({rentNet} + {rentCharges})
+                  <span className="text-brand-400 font-normal">
+                    ({rentNet}+{rentCharges})
                   </span>
                 )}
               </span>
             )}
             {rooms != null && (
-              <span>
+              <span className="inline-flex items-center rounded-md bg-gray-100 px-2 py-1 text-xs font-medium text-gray-700">
                 {rooms} room{rooms !== 1 ? "s" : ""}
               </span>
             )}
             {listing?.surfaceLiving != null && (
-              <span>{listing.surfaceLiving} m²</span>
+              <span className="inline-flex items-center rounded-md bg-gray-100 px-2 py-1 text-xs font-medium text-gray-700">
+                {listing.surfaceLiving} m²
+              </span>
             )}
           </div>
 
+          {/* Rationale */}
           {match.rationale && (
-            <p className="mt-1.5 text-sm text-gray-600 line-clamp-2">
+            <p className="text-sm text-gray-500 line-clamp-1">
               {match.rationale}
             </p>
           )}
         </div>
 
+        {/* Score + actions */}
         <div className="flex flex-col items-end gap-2 shrink-0">
           <div
             className={scorePercent >= 80
@@ -299,7 +316,7 @@ function MatchCard({
                 e.stopPropagation();
                 onDismiss();
               }}
-              className="text-xs text-gray-400 hover:text-red-500"
+              className="text-xs text-gray-400 transition-colors hover:text-red-500"
             >
               Dismiss
             </button>

@@ -101,22 +101,12 @@ export default function DashboardPage() {
   const totalPages = Math.ceil(total / limit);
 
   return (
-    <main className="mx-auto max-w-4xl px-4 py-8">
-      <div className="flex items-center justify-between mb-6">
-        <div>
-          <h1 className="text-2xl font-bold">Your matches</h1>
-          {session?.user?.name && (
-            <p className="text-sm text-gray-500 mt-1">
-              Welcome back, {session.user.name}
-            </p>
-          )}
-        </div>
-        <Link
-          href="/settings"
-          className="text-sm text-gray-500 hover:text-gray-700"
-        >
-          Settings
-        </Link>
+    <main className="mx-auto max-w-5xl px-4 py-8">
+      <div className="mb-6">
+        <h1 className="text-2xl font-bold text-gray-900">Your matches</h1>
+        <p className="text-sm text-gray-500 mt-1">
+          Listings that match your preferences, ranked by score.
+        </p>
       </div>
 
       {/* Status filter */}

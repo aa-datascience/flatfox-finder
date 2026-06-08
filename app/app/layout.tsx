@@ -1,11 +1,12 @@
 import type { Metadata } from "next";
 
+import Header from "@/components/Header";
 import Providers from "./providers";
 import "./globals.css";
 
 export const metadata: Metadata = {
-  title: "Flatfox Finder",
-  description: "AI-powered student housing matching",
+  title: "FlatfoxFinder — AI-Powered Student Housing",
+  description: "AI-powered student housing matching for Switzerland",
 };
 
 export default function RootLayout({
@@ -16,7 +17,10 @@ export default function RootLayout({
   return (
     <html lang="en">
       <body>
-        <Providers>{children}</Providers>
+        <Providers>
+          <Header />
+          <main className="min-h-[calc(100vh-4rem)]">{children}</main>
+        </Providers>
       </body>
     </html>
   );

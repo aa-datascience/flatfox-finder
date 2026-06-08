@@ -209,11 +209,11 @@ export default function SettingsPage() {
 
   return (
     <main className="mx-auto max-w-2xl px-4 py-8">
-      <div className="flex items-center justify-between mb-6">
-        <h1 className="text-2xl font-bold">Settings</h1>
-        <Link href="/dashboard" className="text-sm text-gray-500 hover:text-gray-700">
-          Back to dashboard
-        </Link>
+      <div className="mb-6">
+        <h1 className="text-2xl font-bold text-gray-900">Settings</h1>
+        <p className="text-sm text-gray-500 mt-1">
+          Manage your profile, preferences, and account.
+        </p>
       </div>
 
       {/* Section tabs */}

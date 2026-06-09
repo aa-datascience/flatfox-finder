@@ -18,7 +18,7 @@ PROMPT_PATH = Path(__file__).resolve().parent.parent.parent / "prompts" / "extra
 SYSTEM_PROMPT = PROMPT_PATH.read_text(encoding="utf-8").split("System: ", 1)[1]
 
 EXTRACTION_MODEL = "claude-haiku-4-5-20251001"
-MAX_EXTRACTIONS_PER_RUN = 500  # cap per run to control costs
+MAX_EXTRACTIONS_PER_RUN = 0  # 0 = no limit; pre-filter ensures only matchable listings are extracted
 
 VALID_VIBES = {"quiet", "social", "mixed"}
 VALID_GENDER = {"any", "female_only", "male_only"}
@@ -101,21 +101,35 @@ def _could_match_any_profile(
     listing: dict[str, Any],
     profiles: list[dict[str, Any]],
 ) -> bool:
-    """Return True if listing could pass hard filters for at least one profile."""
+    """Return True if listing passes BOTH budget AND location for at least one profile."""
     if not profiles:
         return False
 
-    rent = listing.get("rent_gross")
+    raw_gross = listing.get("rent_gross")
+    rent_net = listing.get("rent_net")
+    rent_charges = listing.get("rent_charges")
+
+    # Compute effective gross (same logic as matcher, treat 0 as missing)
+    effective_gross: float | None = None
+    if raw_gross is not None and raw_gross > 0:
+        effective_gross = raw_gross
+    elif rent_net is not None and rent_net > 0:
+        effective_gross = rent_net + (rent_charges or 0)
+
+    # No rent info → can't match anyone
+    if effective_gross is None:
+        return False
+
     lat = listing.get("lat")
     lng = listing.get("lng")
     city = listing.get("city")
 
     for p in profiles:
-        # Budget check: skip if listing is over this profile's budget
-        if p["budget_max"] is not None and rent is not None and rent > p["budget_max"]:
+        # Budget check: MUST pass
+        if p["budget_max"] is not None and effective_gross > p["budget_max"]:
             continue
 
-        # Location check: skip if listing is outside 2x radius of all preferred cities
+        # Location check: MUST pass
         if p["cities"]:
             location_ok = False
             for pc in p["cities"]:
@@ -127,7 +141,7 @@ def _could_match_any_profile(
                     continue
                 if lat is not None and lng is not None:
                     dist = _haversine(coords[0], coords[1], lat, lng)
-                    if dist <= 2 * p["radius_km"]:
+                    if dist <= p["radius_km"]:
                         location_ok = True
                         break
                 elif city and pc.lower().strip() == city.lower().strip():
@@ -136,6 +150,7 @@ def _could_match_any_profile(
             if not location_ok:
                 continue
 
+        # Both budget AND location passed for this profile
         return True
 
     return False
@@ -144,7 +159,9 @@ def _could_match_any_profile(
 def _fetch_unextracted(conn, profiles: list[dict[str, Any]] | None = None) -> list[dict[str, Any]]:
     with conn.cursor() as cur:
         cur.execute("""
-            SELECT l.id, l.public_title, l.description, l.rent_gross, l.lat, l.lng, l.city
+            SELECT l.id, l.public_title, l.description,
+                   l.rent_gross, l.rent_net, l.rent_charges,
+                   l.lat, l.lng, l.city
             FROM listings l
             LEFT JOIN listing_attributes la ON la.listing_id = l.id
             WHERE la.listing_id IS NULL AND l.status != 'removed'
@@ -152,7 +169,8 @@ def _fetch_unextracted(conn, profiles: list[dict[str, Any]] | None = None) -> li
         all_listings = [
             {
                 "id": row[0], "title": row[1], "description": row[2],
-                "rent_gross": row[3], "lat": row[4], "lng": row[5], "city": row[6],
+                "rent_gross": row[3], "rent_net": row[4], "rent_charges": row[5],
+                "lat": row[6], "lng": row[7], "city": row[8],
             }
             for row in cur.fetchall()
         ]
@@ -314,9 +332,10 @@ def run_extraction(database_url: str | None = None) -> int:
             logger.info("No listings need extraction.")
             return 0
 
-        logger.info("%d listings need extraction.", len(listings))
-        listings = listings[:MAX_EXTRACTIONS_PER_RUN]
-        logger.info("Capped to %d listings for this run.", len(listings))
+        logger.info("%d listings need extraction (pre-filtered to matchable only).", len(listings))
+        if MAX_EXTRACTIONS_PER_RUN > 0:
+            listings = listings[:MAX_EXTRACTIONS_PER_RUN]
+            logger.info("Capped to %d listings for this run.", len(listings))
 
         ai_client = anthropic.Anthropic(api_key=settings.anthropic_api_key)
 

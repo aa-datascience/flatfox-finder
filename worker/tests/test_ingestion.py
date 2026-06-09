@@ -171,3 +171,24 @@ class TestIngestion:
         assert stats["fetched"] == 600
         assert stats["new"] == 600
         assert _count_listings() == 600
+
+    def test_dedupes_duplicate_pks_within_batch(self):
+        # Flatfox pagination can return the same listing twice when the underlying
+        # list shifts mid-crawl. Without dedupe, Postgres rejects the batch with
+        # 'ON CONFLICT DO UPDATE command cannot affect row a second time'.
+        client = MagicMock()
+        client.fetch_listings.return_value = iter([
+            _make_listing(pk=1, city="Zürich"),
+            _make_listing(pk=2),
+            _make_listing(pk=1, city="Geneva"),  # duplicate pk, later wins
+        ])
+
+        stats = run_ingestion(client, database_url=TEST_DB_URL)
+
+        assert stats["fetched"] == 3
+        assert stats["deduped"] == 2
+        assert stats["duplicates"] == 1
+        assert stats["new"] == 2
+        assert _count_listings() == 2
+        # Last occurrence should win.
+        assert _get_listing(1)["city"] == "Geneva"

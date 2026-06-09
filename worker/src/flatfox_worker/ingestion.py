@@ -86,12 +86,27 @@ def run_ingestion(
     db_url = database_url or settings.database_url
     now = datetime.now(timezone.utc)
 
-    listings = list(client.fetch_listings(max_pages=max_pages))
-    if not listings:
+    raw_listings = list(client.fetch_listings(max_pages=max_pages))
+    if not raw_listings:
         logger.warning("No listings fetched — skipping ingestion.")
         return {"fetched": 0, "new": 0, "updated": 0, "removed": 0}
 
-    fetched_ids = {l.pk for l in listings}
+    # The Flatfox API can return the same listing on multiple pages (pagination shifts
+    # while we crawl 35k rows). Dedupe by primary key — keep the last occurrence so the
+    # freshest fields win — before upserting, otherwise Postgres rejects the batch with
+    # "ON CONFLICT DO UPDATE command cannot affect row a second time".
+    deduped: dict[int, NormalizedListing] = {}
+    for l in raw_listings:
+        deduped[l.pk] = l
+    duplicates = len(raw_listings) - len(deduped)
+    if duplicates:
+        logger.warning(
+            "Dropped %d duplicate listings from fetch batch (kept last occurrence of each pk).",
+            duplicates,
+        )
+    listings = list(deduped.values())
+
+    fetched_ids = set(deduped.keys())
 
     conn = psycopg2.connect(db_url)
     try:
@@ -121,14 +136,17 @@ def run_ingestion(
             conn.commit()
 
         stats = {
-            "fetched": len(listings),
+            "fetched": len(raw_listings),
+            "deduped": len(listings),
+            "duplicates": duplicates,
             "new": len(new_ids),
             "updated": len(updated_ids),
             "removed": len(removed_ids),
         }
         logger.info(
-            "Ingestion complete: fetched=%d, new=%d, updated=%d, removed=%d",
-            stats["fetched"], stats["new"], stats["updated"], stats["removed"],
+            "Ingestion complete: fetched=%d, deduped=%d, duplicates=%d, new=%d, updated=%d, removed=%d",
+            stats["fetched"], stats["deduped"], stats["duplicates"],
+            stats["new"], stats["updated"], stats["removed"],
         )
         return stats
 

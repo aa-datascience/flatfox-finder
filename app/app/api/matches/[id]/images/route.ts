@@ -40,7 +40,7 @@ export async function GET(
 
   try {
     const res = await fetch(
-      `${FLATFOX_BASE}/api/v1/public-listing/${match.listing.slug}/?expand=images`,
+      `${FLATFOX_BASE}/api/v1/public-listing/${match.listing.id}/?expand=images`,
       { next: { revalidate: 3600 } }
     );
 

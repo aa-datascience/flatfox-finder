@@ -24,7 +24,17 @@ interface Listing {
   movingDate: string | null;
   movingDateType: string | null;
   description: string | null;
+  lat: number | null;
+  lng: number | null;
   reserved: boolean;
+}
+
+interface ListingImage {
+  url: string;
+  thumb: string;
+  caption: string | null;
+  width: number;
+  height: number;
 }
 
 interface Attributes {
@@ -74,6 +84,9 @@ export default function MatchDetailPage() {
   const [translating, setTranslating] = useState(false);
   const [showOriginal, setShowOriginal] = useState(false);
 
+  const [images, setImages] = useState<ListingImage[]>([]);
+  const [activeImg, setActiveImg] = useState(0);
+
   useEffect(() => {
     async function load() {
       try {
@@ -85,6 +98,12 @@ export default function MatchDetailPage() {
           setDraft(detail.message_draft);
           setShowEditor(true);
         }
+        // Fetch images (non-blocking)
+        fetch(`/api/matches/${id}/images`)
+          .then((r) => r.ok ? r.json() : { images: [] })
+          .then((d) => setImages(d.images ?? []))
+          .catch(() => {/* non-critical */});
+
         if (detail.listing?.description) {
           setTranslating(true);
           try {
@@ -261,9 +280,72 @@ export default function MatchDetailPage() {
         </div>
       </div>
 
+      {/* Image gallery */}
+      {images.length > 0 && (
+        <div className="card overflow-hidden mb-6">
+          <div className="relative aspect-[16/9] bg-gray-100">
+            {/* eslint-disable-next-line @next/next/no-img-element */}
+            <img
+              src={images[activeImg].url}
+              alt={images[activeImg].caption ?? `Photo ${activeImg + 1}`}
+              className="h-full w-full object-cover"
+            />
+            {images.length > 1 && (
+              <>
+                <button
+                  onClick={() => setActiveImg((i) => (i - 1 + images.length) % images.length)}
+                  className="absolute left-2 top-1/2 -translate-y-1/2 rounded-full bg-black/40 p-2 text-white hover:bg-black/60 transition-colors"
+                >
+                  <svg className="h-5 w-5" viewBox="0 0 20 20" fill="currentColor"><path fillRule="evenodd" d="M12.79 5.23a.75.75 0 01-.02 1.06L8.832 10l3.938 3.71a.75.75 0 11-1.04 1.08l-4.5-4.25a.75.75 0 010-1.08l4.5-4.25a.75.75 0 011.06.02z" clipRule="evenodd" /></svg>
+                </button>
+                <button
+                  onClick={() => setActiveImg((i) => (i + 1) % images.length)}
+                  className="absolute right-2 top-1/2 -translate-y-1/2 rounded-full bg-black/40 p-2 text-white hover:bg-black/60 transition-colors"
+                >
+                  <svg className="h-5 w-5" viewBox="0 0 20 20" fill="currentColor"><path fillRule="evenodd" d="M7.21 14.77a.75.75 0 01.02-1.06L11.168 10 7.23 6.29a.75.75 0 111.04-1.08l4.5 4.25a.75.75 0 010 1.08l-4.5 4.25a.75.75 0 01-1.06-.02z" clipRule="evenodd" /></svg>
+                </button>
+                <div className="absolute bottom-3 left-1/2 -translate-x-1/2 rounded-full bg-black/50 px-3 py-1 text-xs text-white">
+                  {activeImg + 1} / {images.length}
+                </div>
+              </>
+            )}
+          </div>
+          {images.length > 1 && (
+            <div className="flex gap-1.5 p-3 overflow-x-auto">
+              {images.map((img, i) => (
+                <button
+                  key={i}
+                  onClick={() => setActiveImg(i)}
+                  className={`shrink-0 rounded-lg overflow-hidden border-2 transition-all ${
+                    i === activeImg ? "border-brand-500 shadow-sm" : "border-transparent opacity-60 hover:opacity-100"
+                  }`}
+                >
+                  {/* eslint-disable-next-line @next/next/no-img-element */}
+                  <img src={img.thumb} alt={img.caption ?? `Thumb ${i + 1}`} className="h-14 w-20 object-cover" />
+                </button>
+              ))}
+            </div>
+          )}
+        </div>
+      )}
+
       {/* Listing details */}
       {listing && (
         <div className="card p-6 mb-6">
+          {/* Map */}
+          {listing.lat != null && listing.lng != null && (
+            <div className="mb-5 rounded-lg overflow-hidden border border-gray-200">
+              <iframe
+                title="Listing location"
+                width="100%"
+                height="200"
+                style={{ border: 0 }}
+                loading="lazy"
+                src={`https://www.openstreetmap.org/export/embed.html?bbox=${listing.lng - 0.01},${listing.lat - 0.007},${listing.lng + 0.01},${listing.lat + 0.007}&layer=mapnik&marker=${listing.lat},${listing.lng}`}
+              />
+            </div>
+          )}
+
           <h2 className="text-sm font-semibold text-gray-900 uppercase tracking-wide mb-4">
             Listing details
           </h2>

@@ -449,68 +449,134 @@ export default function MatchDetailPage() {
 
       {/* Score breakdown */}
       <div className="card p-6 mb-6">
-        <div className="flex items-baseline justify-between mb-4">
+        <div className="flex items-baseline justify-between mb-1">
           <h2 className="text-sm font-semibold text-gray-900 uppercase tracking-wide">
-            Match analysis
+            Why this is a {scorePercent}% match
           </h2>
           {(() => {
             const c = match.scoreBreakdown?.completeness;
             if (typeof c !== "number") return null;
             const label =
-              c >= 0.95 ? "full profile" : c >= 0.6 ? "partial profile" : "limited info";
+              c >= 0.95 ? "full info" : c >= 0.6 ? "partial info" : "limited info";
             return (
-              <span className="text-xs text-gray-500">
-                {Math.round(c * 100)}% data · {label}
+              <span
+                className="text-xs text-gray-500"
+                title="How much information we had to compare. Higher = more reliable score."
+              >
+                {label}
               </span>
             );
           })()}
         </div>
-        {match.rationale && (
-          <p className="text-sm text-gray-600 mb-5">{match.rationale}</p>
-        )}
-        {match.scoreBreakdown && Object.keys(match.scoreBreakdown).length > 0 && (
-          <div className="space-y-3">
-            {(() => {
-              const order = ["price", "location", "rooms", "date", "l1", "l2"];
-              const labels: Record<string, string> = {
-                price: "Price",
-                location: "Location",
-                rooms: "Rooms",
-                date: "Move-in date",
-                l1: "Layer 1 (quantitative)",
-                l2: "Layer 2 (lifestyle)",
-              };
-              const entries = order
-                .filter((k) => k in match.scoreBreakdown)
-                .map((k) => [k, match.scoreBreakdown[k]] as const);
+        <p className="text-xs text-gray-500 mb-5">
+          Each line compares the listing against the preferences you set in your profile.
+        </p>
 
-              return entries.map(([key, val]) => {
-                const isAbsent = val == null;
-                const pct = typeof val === "number" ? Math.round(val * 100) : 0;
-                const barColor =
-                  pct >= 80 ? "bg-brand-500" : pct >= 50 ? "bg-accent-400" : "bg-gray-300";
-                return (
-                  <div key={key}>
-                    <div className="flex items-center justify-between text-sm mb-1">
-                      <span className="text-gray-600">{labels[key] ?? key}</span>
-                      <span className="font-semibold text-gray-900">
-                        {isAbsent ? <span className="text-gray-400">not compared</span> : `${pct}%`}
-                      </span>
-                    </div>
-                    <div className="h-2 rounded-full bg-gray-100 overflow-hidden">
-                      {!isAbsent && (
-                        <div
-                          className={`h-full rounded-full transition-all ${barColor}`}
-                          style={{ width: `${pct}%` }}
-                        />
-                      )}
-                    </div>
-                  </div>
-                );
+        {(() => {
+          if (!match.rationale) return null;
+
+          type Row = { criterion: string; status: "ok" | "partial" | "miss"; detail: string };
+          const L1_LABELS: Record<string, string> = {
+            Budget: "Price vs. your budget",
+            Location: "Distance to a preferred city",
+            Rooms: "Number of rooms",
+            Date: "Move-in date",
+          };
+          const L2_LABELS: Record<string, string> = {
+            vibe: "Vibe",
+            pets: "Pets",
+            smoking: "Smoking",
+            languages: "Languages",
+            gender_pref: "Gender preference",
+          };
+          const STATUS_FROM_SYMBOL: Record<string, "ok" | "partial" | "miss"> = {
+            "✓": "ok",
+            "~": "partial",
+            "✗": "miss",
+          };
+
+          const practical: Row[] = [];
+          const lifestyle: Row[] = [];
+
+          for (const raw of match.rationale.split(", ")) {
+            const part = raw.trim();
+            if (!part) continue;
+            // L1 sub-scores look like: "Budget ✓ (CHF 950 ≤ 1200)" or "Budget: unknown"
+            const l1Key = Object.keys(L1_LABELS).find((k) => part.startsWith(k));
+            if (l1Key) {
+              const sym = part.match(/[✓~✗]/)?.[0];
+              if (!sym) continue;
+              const detailMatch = part.match(/\(([^)]+)\)/);
+              practical.push({
+                criterion: L1_LABELS[l1Key],
+                status: STATUS_FROM_SYMBOL[sym],
+                detail: detailMatch ? detailMatch[1] : "",
               });
-            })()}
-          </div>
-        )}
+              continue;
+            }
+            // L2 attributes look like: "vibe ✓", "languages ~"
+            const l2Key = Object.keys(L2_LABELS).find((k) => part.startsWith(k + " "));
+            if (l2Key) {
+              const sym = part.slice(l2Key.length + 1).trim();
+              if (!STATUS_FROM_SYMBOL[sym]) continue;
+              lifestyle.push({
+                criterion: L2_LABELS[l2Key],
+                status: STATUS_FROM_SYMBOL[sym],
+                detail: "",
+              });
+            }
+          }
+
+          const renderRow = (r: Row) => {
+            const styles =
+              r.status === "ok"
+                ? { dot: "bg-brand-500", text: "good fit" }
+                : r.status === "partial"
+                  ? { dot: "bg-accent-400", text: "partial fit" }
+                  : { dot: "bg-rose-400", text: "doesn't match" };
+            return (
+              <div
+                key={`${r.criterion}-${r.detail}`}
+                className="flex items-start gap-3 py-2 border-b border-gray-100 last:border-0"
+              >
+                <span className={`mt-2 h-2 w-2 rounded-full shrink-0 ${styles.dot}`} />
+                <div className="flex-1 min-w-0">
+                  <div className="flex items-baseline justify-between gap-3">
+                    <span className="text-sm font-medium text-gray-900">{r.criterion}</span>
+                    <span className="text-xs text-gray-500 shrink-0">{styles.text}</span>
+                  </div>
+                  {r.detail && (
+                    <p className="text-xs text-gray-500 mt-0.5">{r.detail}</p>
+                  )}
+                </div>
+              </div>
+            );
+          };
+
+          return (
+            <div className="space-y-5">
+              {practical.length > 0 && (
+                <div>
+                  <h3 className="text-xs font-semibold text-gray-500 uppercase tracking-wide mb-1">
+                    Practical fit
+                  </h3>
+                  <div>{practical.map(renderRow)}</div>
+                </div>
+              )}
+              {lifestyle.length > 0 && (
+                <div>
+                  <h3 className="text-xs font-semibold text-gray-500 uppercase tracking-wide mb-1">
+                    Lifestyle fit
+                  </h3>
+                  <p className="text-xs text-gray-400 mb-1">
+                    Extracted by AI from the listing description — may be incomplete.
+                  </p>
+                  <div>{lifestyle.map(renderRow)}</div>
+                </div>
+              )}
+            </div>
+          );
+        })()}
       </div>
 
       {/* Message drafting */}

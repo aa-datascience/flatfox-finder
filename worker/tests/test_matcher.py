@@ -1,4 +1,4 @@
-from datetime import datetime, timezone
+from datetime import datetime, timedelta, timezone
 
 import psycopg2
 import pytest
@@ -70,25 +70,26 @@ class TestPriceScore:
         score, _ = price_score(1500, 1500)
         assert score == 1.0
 
-    def test_over_budget_within_130(self):
-        score, _ = price_score(1800, 1500)
-        assert 0 < score < 1
+    def test_over_budget_smooth_midrange(self):
+        # Halfway between budget and ceiling — quadratic decay puts it at 0.75
+        score, _ = price_score(1500 + (1500 * 0.3) / 2, 1500)
+        assert score == pytest.approx(0.75, abs=0.01)
 
-    def test_over_budget_at_130(self):
-        score, _ = price_score(1950, 1500)
-        assert score == pytest.approx(0.0, abs=0.01)
+    def test_at_ceiling(self):
+        score, _ = price_score(1500 * 1.3, 1500)
+        assert score == pytest.approx(0.0, abs=1e-6)
 
-    def test_over_budget_hard_cut(self):
+    def test_above_ceiling_clamps_to_zero(self):
         score, _ = price_score(2000, 1500)
         assert score == 0.0
 
-    def test_none_rent(self):
+    def test_none_rent_is_absent(self):
         score, _ = price_score(None, 1500)
-        assert score == 0.5
+        assert score is None
 
-    def test_none_budget(self):
+    def test_none_budget_is_absent(self):
         score, _ = price_score(1200, None)
-        assert score == 0.5
+        assert score is None
 
 
 # === Layer 1: Location ===
@@ -103,19 +104,14 @@ class TestLocationScore:
         score, _ = location_score(47.5001, 8.7240, "Winterthur", ["Zürich"], 30)
         assert score == 1.0
 
-    def test_outside_radius_within_2x(self):
-        # ~25km away, radius=15 → between 1x and 2x
+    def test_outside_radius_within_ceiling(self):
+        # ~25km away, radius=15 → between ideal and ceiling (30)
         score, _ = location_score(47.5001, 8.7240, "Winterthur", ["Zürich"], 15)
         assert 0 < score < 1
 
-    def test_hard_cut_beyond_2x(self):
-        # ~25km away, radius=5 → over 2x
-        score, _ = location_score(47.5001, 8.7240, "Winterthur", ["Zürich"], 5)
-        assert score == 0.0
-
-    def test_no_preference(self):
+    def test_no_preference_is_absent(self):
         score, _ = location_score(47.3769, 8.5417, "Zürich", [], 10)
-        assert score == 0.5
+        assert score is None
 
     def test_city_name_fallback(self):
         score, _ = location_score(None, None, "Zürich", ["Zürich"], 10)
@@ -130,16 +126,18 @@ class TestRoomsScore:
         assert score == 1.0
 
     def test_half_room_off(self):
+        # deficit 0.5, tolerance 1.0 → 1 - 0.25 = 0.75
         score, _ = rooms_score(1.5, 2.0)
-        assert score == 0.5
+        assert score == pytest.approx(0.75, abs=1e-6)
 
-    def test_more_than_half_off(self):
+    def test_full_room_off(self):
+        # deficit 1.0, tolerance 1.0 → 0.0
         score, _ = rooms_score(1.0, 2.0)
-        assert score == 0.0
+        assert score == pytest.approx(0.0, abs=1e-6)
 
-    def test_none_rooms(self):
+    def test_none_rooms_is_absent(self):
         score, _ = rooms_score(None, 2.0)
-        assert score == 0.5
+        assert score is None
 
 
 # === Layer 1: Date ===
@@ -150,29 +148,36 @@ class TestDateScore:
         score, _ = date_score(d, d, False)
         assert score == 1.0
 
-    def test_within_14_days(self):
-        d1 = datetime(2026, 8, 1, tzinfo=timezone.utc)
-        d2 = datetime(2026, 8, 10, tzinfo=timezone.utc)
-        score, _ = date_score(d1, d2, False)
+    def test_early_within_grace(self):
+        target = datetime(2026, 8, 1, tzinfo=timezone.utc)
+        listing = target - timedelta(days=20)
+        score, _ = date_score(listing, target, False)
         assert score == 1.0
 
-    def test_within_30_days_flexible(self):
-        d1 = datetime(2026, 8, 1, tzinfo=timezone.utc)
-        d2 = datetime(2026, 8, 25, tzinfo=timezone.utc)
-        score, _ = date_score(d1, d2, True)
+    def test_late_within_grace_flexible(self):
+        target = datetime(2026, 8, 1, tzinfo=timezone.utc)
+        listing = target + timedelta(days=14)
+        score, _ = date_score(listing, target, True)
         assert score == 1.0
 
-    def test_within_30_days_not_flexible(self):
-        d1 = datetime(2026, 8, 1, tzinfo=timezone.utc)
-        d2 = datetime(2026, 8, 25, tzinfo=timezone.utc)
-        score, _ = date_score(d1, d2, False)
-        assert score == 0.5
+    def test_early_vs_late_asymmetric(self):
+        target = datetime(2026, 8, 1, tzinfo=timezone.utc)
+        early = target - timedelta(days=60)
+        late = target + timedelta(days=60)
+        early_score, _ = date_score(early, target, False)
+        late_score, _ = date_score(late, target, False)
+        # Same offset, but late must score lower than early
+        assert early_score > late_score
 
-    def test_over_30_days(self):
-        d1 = datetime(2026, 8, 1, tzinfo=timezone.utc)
-        d2 = datetime(2026, 10, 1, tzinfo=timezone.utc)
-        score, _ = date_score(d1, d2, True)
-        assert score == 0.0
+    def test_very_late_decays_to_zero(self):
+        target = datetime(2026, 8, 1, tzinfo=timezone.utc)
+        listing = target + timedelta(days=45)
+        score, _ = date_score(listing, target, False)
+        assert score == pytest.approx(0.0, abs=1e-6)
+
+    def test_missing_is_absent(self):
+        score, _ = date_score(None, None, True)
+        assert score is None
 
 
 # === Layer 2: Text attributes ===
@@ -181,26 +186,36 @@ class TestLayer2:
     def test_all_match(self):
         p = _profile(vibe="quiet", languages=["de"], pets_ok=False, smoking_ok=False, gender_pref="any")
         l = _listing(vibe="quiet", languages=["de"], pets=False, smoking=False, gender_pref="any")
-        score, reasons = layer2_score(p, l)
+        score, _reasons, present = layer2_score(p, l)
         assert score == 1.0
+        assert present == 5
 
     def test_all_conflict(self):
         p = _profile(vibe="quiet", pets_ok=True, smoking_ok=True)
         l = _listing(vibe="social", pets=False, smoking=False, languages=[], gender_pref=None)
-        score, _ = layer2_score(p, l)
+        score, _, _present = layer2_score(p, l)
         assert score == 0.0
 
-    def test_mixed_vibe_no_conflict(self):
-        p = _profile(vibe="quiet")
+    def test_mixed_vibe_gets_bonus(self):
+        p = _profile(vibe="quiet", pets_ok=None, smoking_ok=None, gender_pref=None, languages=[])
         l = _listing(vibe="mixed", languages=[], pets=None, smoking=None, gender_pref=None)
-        score, _ = layer2_score(p, l)
-        assert score >= 0.5
+        score, _, _ = layer2_score(p, l)
+        assert score == pytest.approx(0.65, abs=1e-6)
 
-    def test_all_null(self):
+    def test_all_null_is_absent(self):
         p = _profile(vibe=None, languages=[], pets_ok=None, smoking_ok=None, gender_pref=None)
         l = _listing(vibe=None, languages=[], pets=None, smoking=None, gender_pref=None)
-        score, _ = layer2_score(p, l)
-        assert score == 0.5
+        score, _, present = layer2_score(p, l)
+        assert score is None
+        assert present == 0
+
+    def test_languages_partial_overlap(self):
+        p = _profile(vibe=None, languages=["de", "en"], pets_ok=None, smoking_ok=None, gender_pref=None)
+        l = _listing(vibe=None, languages=["de"], pets=None, smoking=None, gender_pref=None)
+        score, _, present = layer2_score(p, l)
+        # 1 of 2 user languages covered → 0.5
+        assert score == pytest.approx(0.5, abs=1e-6)
+        assert present == 1
 
 
 # === Full match ===
@@ -226,19 +241,35 @@ class TestComputeMatch:
         result = compute_match(_profile(), _listing())
         assert result is not None
         bd = result["score_breakdown"]
-        assert all(k in bd for k in ["l1", "l2", "price", "location", "rooms", "date"])
+        assert all(k in bd for k in ["l1", "l2", "price", "location", "rooms", "date", "coverage", "completeness"])
 
-    def test_rationale_contains_info(self):
+    def test_no_l2_attributes_falls_back_to_l1(self):
+        # Listing has no extractable attributes — final should equal L1
+        p = _profile(vibe="quiet", languages=["de"], pets_ok=False, smoking_ok=False, gender_pref="any")
+        l = _listing(vibe=None, languages=[], pets=None, smoking=None, gender_pref=None)
+        result = compute_match(p, l)
+        assert result is not None
+        assert result["score_breakdown"]["l2"] is None
+        assert result["score_breakdown"]["coverage"] == 0.0
+        assert result["score"] == result["score_breakdown"]["l1"]
+
+    def test_completeness_reported(self):
         result = compute_match(_profile(), _listing())
         assert result is not None
-        assert "Budget" in result["rationale"]
-        assert "Location" in result["rationale"]
+        # 4 L1 sub-scores present + 5 L2 attributes present → 9/9
+        assert result["score_breakdown"]["completeness"] == 1.0
 
-    def test_listing_snapshot(self):
-        result = compute_match(_profile(), _listing(public_title="Great flat", city="Zürich", rent_gross=1200))
-        assert result is not None
-        assert result["listing_snapshot"]["title"] == "Great flat"
-        assert result["listing_snapshot"]["city"] == "Zürich"
+    def test_hard_filter_far_too_late(self):
+        target = datetime(2026, 8, 1, tzinfo=timezone.utc)
+        result = compute_match(
+            _profile(move_in_from=target, move_in_flexible=False),
+            _listing(moving_date=target + timedelta(days=200)),
+        )
+        assert result is None
+
+    def test_hard_filter_far_too_few_rooms(self):
+        result = compute_match(_profile(rooms_min=4.0), _listing(number_of_rooms=1.0))
+        assert result is None
 
 
 # === Integration: run_matching ===

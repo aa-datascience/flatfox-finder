@@ -2,13 +2,33 @@ import type { Prisma } from "@prisma/client";
 
 import { prisma } from "@/lib/db";
 
-const L1_WEIGHT = 0.6;
-const L2_WEIGHT = 0.4;
+// Base layer weights (renormalized by Layer 2 coverage in the final blend).
+const L1_BASE_WEIGHT = 0.6;
+const L2_BASE_WEIGHT = 0.4;
 
 const PRICE_W = 0.35;
-const LOCATION_W = 0.30;
+const LOCATION_W = 0.3;
 const ROOMS_W = 0.15;
-const DATE_W = 0.20;
+const DATE_W = 0.2;
+
+// Curve parameters (v2 — see MATCHING-ALGORITHM-V2.md).
+const BUDGET_CEILING_MULT = 1.3;
+const RADIUS_CEILING_MULT = 2.0;
+const ROOMS_TOLERANCE = 1.0;
+const ROOMS_HARD_DEFICIT = 2.0;
+const DATE_GRACE_EARLY = 30;
+const DATE_EARLY_CEILING = 120;
+const DATE_EARLY_FLOOR_DROP = 0.6;
+const DATE_GRACE_LATE = 7;
+const DATE_LATE_CEILING = 45;
+const DATE_MAX_LATE = 120;
+const DATE_FLEX_BONUS_GRACE = 14;
+const DATE_FLEX_BONUS_CEILING = 30;
+const DATE_FLEX_BONUS_MAX_LATE = 30;
+const VIBE_MIXED_SCORE = 0.65;
+
+const L2_ATTRIBUTE_COUNT = 5;
+const L1_SUBSCORE_COUNT = 4;
 
 const MATCH_SCORE_THRESHOLD = 0.5;
 const EARTH_RADIUS_KM = 6371.0;
@@ -21,16 +41,16 @@ const CITY_COORDS: Record<string, [number, number]> = {
   "geneva": [46.2044, 6.1432],
   "geneve": [46.2044, 6.1432],
   "basel": [47.5596, 7.5886],
-  "bern": [46.9480, 7.4474],
-  "winterthur": [47.5001, 8.7240],
+  "bern": [46.948, 7.4474],
+  "winterthur": [47.5001, 8.724],
   "luzern": [47.0502, 8.3093],
   "lucerne": [47.0502, 8.3093],
   "st. gallen": [47.4245, 9.3767],
   "st.gallen": [47.4245, 9.3767],
   "lugano": [46.0037, 8.9511],
-  "fribourg": [46.8065, 7.1620],
-  "neuchâtel": [46.9900, 6.9293],
-  "neuchatel": [46.9900, 6.9293],
+  "fribourg": [46.8065, 7.162],
+  "neuchâtel": [46.99, 6.9293],
+  "neuchatel": [46.99, 6.9293],
 };
 
 interface Profile {
@@ -87,13 +107,34 @@ function haversine(lat1: number, lon1: number, lat2: number, lon2: number): numb
   return 2 * EARTH_RADIUS_KM * Math.asin(Math.sqrt(a));
 }
 
-function priceScore(rentGross: number | null, budgetMax: number | null): [number, string] {
-  if (rentGross == null || budgetMax == null) return [0.5, "Budget: unknown"];
+function clamp(v: number, lo = 0, hi = 1): number {
+  if (v < lo) return lo;
+  if (v > hi) return hi;
+  return v;
+}
+
+function smoothDecay(value: number, target: number, ceiling: number): number {
+  if (ceiling <= target) return value <= target ? 1.0 : 0.0;
+  const x = clamp((value - target) / (ceiling - target));
+  return 1.0 - x * x;
+}
+
+function getCityCoords(city: string): [number, number] | undefined {
+  return CITY_COORDS[city.toLowerCase().trim()];
+}
+
+function diffDays(a: Date, b: Date): number {
+  return Math.round((a.getTime() - b.getTime()) / (1000 * 60 * 60 * 24));
+}
+
+// === Layer 1 sub-scores ===
+
+function priceScore(rentGross: number | null, budgetMax: number | null): [number | null, string] {
+  if (rentGross == null || budgetMax == null) return [null, "Budget: unknown"];
   if (rentGross <= budgetMax) return [1.0, `Budget ✓ (CHF ${rentGross.toFixed(0)} ≤ ${budgetMax})`];
-  const ratio = rentGross / budgetMax;
-  if (ratio > 1.3) return [0.0, `Budget ✗ (CHF ${rentGross.toFixed(0)} > 130% of ${budgetMax})`];
-  const score = 1.0 - (ratio - 1.0) / 0.3;
-  return [score, `Budget ~ (CHF ${rentGross.toFixed(0)}, ${(ratio * 100).toFixed(0)}% of ${budgetMax})`];
+  const ceiling = budgetMax * BUDGET_CEILING_MULT;
+  const score = smoothDecay(rentGross, budgetMax, ceiling);
+  return [score, `Budget ~ (CHF ${rentGross.toFixed(0)}, ${Math.round((rentGross / budgetMax) * 100)}% of ${budgetMax})`];
 }
 
 function locationScore(
@@ -102,14 +143,15 @@ function locationScore(
   listingCity: string | null,
   profileCities: string[],
   radiusKm: number
-): [number, string] {
-  if (profileCities.length === 0) return [0.5, "Location: no preference"];
+): [number | null, string] {
+  if (profileCities.length === 0) return [null, "Location: no preference"];
 
-  let bestScore = 0.0;
+  let bestScore: number | null = null;
   let bestReason = "Location ✗ (no city match)";
+  const ceiling = radiusKm * RADIUS_CEILING_MULT;
 
   for (const pc of profileCities) {
-    const coords = CITY_COORDS[pc.toLowerCase().trim()];
+    const coords = getCityCoords(pc);
     if (!coords) {
       if (listingCity && pc.toLowerCase().trim() === listingCity.toLowerCase().trim()) {
         return [1.0, `Location ✓ (${listingCity})`];
@@ -120,87 +162,164 @@ function locationScore(
     if (listingLat != null && listingLng != null) {
       const dist = haversine(coords[0], coords[1], listingLat, listingLng);
       if (dist <= radiusKm) return [1.0, `Location ✓ (${dist.toFixed(1)}km from ${pc})`];
-      if (dist <= 2 * radiusKm) {
-        const s = 1.0 - (dist - radiusKm) / radiusKm;
-        if (s > bestScore) {
-          bestScore = s;
-          bestReason = `Location ~ (${dist.toFixed(1)}km from ${pc})`;
-        }
+      const s = smoothDecay(dist, radiusKm, ceiling);
+      if (bestScore == null || s > bestScore) {
+        bestScore = s;
+        bestReason = `Location ~ (${dist.toFixed(1)}km from ${pc})`;
       }
     } else if (listingCity && pc.toLowerCase().trim() === listingCity.toLowerCase().trim()) {
       return [1.0, `Location ✓ (${listingCity})`];
     }
   }
 
-  return [bestScore, bestReason];
+  return [bestScore ?? 0.0, bestReason];
 }
 
-function roomsScore(numberOfRooms: number | null, roomsMin: number | null): [number, string] {
-  if (numberOfRooms == null || roomsMin == null) return [0.5, "Rooms: unknown"];
-  if (numberOfRooms >= roomsMin) return [1.0, `Rooms ✓ (${numberOfRooms} ≥ ${roomsMin})`];
-  if (roomsMin - numberOfRooms <= 0.5) return [0.5, `Rooms ~ (${numberOfRooms}, need ${roomsMin})`];
-  return [0.0, `Rooms ✗ (${numberOfRooms} < ${roomsMin})`];
+function roomsScore(numberOfRooms: number | null, roomsMin: number | null): [number | null, string] {
+  if (numberOfRooms == null || roomsMin == null) return [null, "Rooms: unknown"];
+  const deficit = Math.max(0, roomsMin - numberOfRooms);
+  if (deficit === 0) return [1.0, `Rooms ✓ (${numberOfRooms} ≥ ${roomsMin})`];
+  const score = smoothDecay(deficit, 0, ROOMS_TOLERANCE);
+  return [score, `Rooms ~ (${numberOfRooms}, need ${roomsMin})`];
 }
 
 function dateScore(
   movingDate: Date | null,
   moveInFrom: Date | null,
   moveInFlexible: boolean
-): [number, string] {
-  if (movingDate == null || moveInFrom == null) {
-    return [moveInFlexible ? 0.5 : 0.3, "Date: unknown"];
+): [number | null, string] {
+  if (movingDate == null || moveInFrom == null) return [null, "Date: unknown"];
+  const diff = diffDays(movingDate, moveInFrom);
+
+  if (diff <= 0) {
+    const earliness = -diff;
+    if (earliness <= DATE_GRACE_EARLY) return [1.0, `Date ✓ (${earliness}d early)`];
+    const x = clamp((earliness - DATE_GRACE_EARLY) / (DATE_EARLY_CEILING - DATE_GRACE_EARLY));
+    const score = 1.0 - DATE_EARLY_FLOOR_DROP * x * x;
+    return [score, `Date ~ (${earliness}d early)`];
   }
-  const diffDays = Math.abs(
-    Math.round((movingDate.getTime() - moveInFrom.getTime()) / (1000 * 60 * 60 * 24))
-  );
-  if (diffDays <= 14 || (moveInFlexible && diffDays <= 30)) return [1.0, `Date ✓ (${diffDays}d diff)`];
-  if (diffDays <= 30) return [0.5, `Date ~ (${diffDays}d diff)`];
-  return [0.0, `Date ✗ (${diffDays}d diff)`];
+
+  const graceLate = DATE_GRACE_LATE + (moveInFlexible ? DATE_FLEX_BONUS_GRACE : 0);
+  const lateCeiling = DATE_LATE_CEILING + (moveInFlexible ? DATE_FLEX_BONUS_CEILING : 0);
+  if (diff <= graceLate) return [1.0, `Date ✓ (${diff}d late)`];
+  const score = smoothDecay(diff, graceLate, lateCeiling);
+  return [score, `Date ~ (${diff}d late)`];
 }
 
-function textAttrScore(profileVal: unknown, listingVal: unknown): number {
-  if (profileVal == null || listingVal == null) return 0;
-  if (typeof profileVal === "boolean" && typeof listingVal === "boolean") {
-    return profileVal === listingVal ? 1 : -1;
-  }
-  if (Array.isArray(profileVal) && Array.isArray(listingVal)) {
-    const overlap = profileVal.filter((v) => listingVal.includes(v));
-    return overlap.length > 0 ? 1 : 0;
-  }
-  if (profileVal === listingVal) return 1;
-  if (profileVal === "mixed" || listingVal === "mixed") return 0;
-  return -1;
+// === Layer 2 attributes ===
+
+function categoryScore(profileVal: string, listingVal: string): number {
+  if (profileVal === listingVal) return 1.0;
+  if (profileVal === "mixed" || listingVal === "mixed") return VIBE_MIXED_SCORE;
+  return 0.0;
+}
+
+function languagesScore(profileLangs: string[], listingLangs: string[]): number {
+  const userSet = new Set(profileLangs.map((l) => l.toLowerCase()));
+  const listingSet = new Set(listingLangs.map((l) => l.toLowerCase()));
+  if (userSet.size === 0) return 1.0;
+  let overlap = 0;
+  userSet.forEach((l) => {
+    if (listingSet.has(l)) overlap++;
+  });
+  return overlap / userSet.size;
 }
 
 function layer2Score(
   profile: Profile,
   attrs: ListingWithAttrs["attributes"]
-): [number, string[]] {
-  const pairs: [string, unknown, unknown][] = [
-    ["vibe", profile.vibe, attrs?.vibe ?? null],
-    ["languages", profile.languages.length > 0 ? profile.languages : null, attrs?.languages?.length ? attrs.languages : null],
-    ["pets", profile.petsOk, attrs?.pets ?? null],
-    ["smoking", profile.smokingOk, attrs?.smoking ?? null],
-    ["gender_pref", profile.genderPref, attrs?.genderPref ?? null],
-  ];
-
-  let total = 0;
-  let maxPossible = 0;
+): { score: number | null; reasons: string[]; presentCount: number } {
   const reasons: string[] = [];
+  const present: number[] = [];
 
-  for (const [name, pval, lval] of pairs) {
-    const s = textAttrScore(pval, lval);
-    if (pval != null && lval != null) {
-      maxPossible += 1;
-      total += s;
-      if (s > 0) reasons.push(`${name} ✓`);
-      else if (s < 0) reasons.push(`${name} ✗`);
+  if (profile.vibe != null && attrs?.vibe != null) {
+    const s = categoryScore(profile.vibe, attrs.vibe);
+    present.push(s);
+    reasons.push(`vibe ${s >= 1.0 ? "✓" : s > 0 ? "~" : "✗"}`);
+  }
+
+  if (profile.genderPref != null && attrs?.genderPref != null) {
+    const s = categoryScore(profile.genderPref, attrs.genderPref);
+    present.push(s);
+    reasons.push(`gender_pref ${s >= 1.0 ? "✓" : s > 0 ? "~" : "✗"}`);
+  }
+
+  if (profile.petsOk != null && attrs?.pets != null) {
+    const s = profile.petsOk === attrs.pets ? 1.0 : 0.0;
+    present.push(s);
+    reasons.push(`pets ${s === 1.0 ? "✓" : "✗"}`);
+  }
+
+  if (profile.smokingOk != null && attrs?.smoking != null) {
+    const s = profile.smokingOk === attrs.smoking ? 1.0 : 0.0;
+    present.push(s);
+    reasons.push(`smoking ${s === 1.0 ? "✓" : "✗"}`);
+  }
+
+  if (profile.languages.length > 0 && attrs?.languages && attrs.languages.length > 0) {
+    const s = languagesScore(profile.languages, attrs.languages);
+    present.push(s);
+    reasons.push(`languages ${s >= 1.0 ? "✓" : s > 0 ? "~" : "✗"}`);
+  }
+
+  if (present.length === 0) {
+    return { score: null, reasons: ["No text attributes to compare"], presentCount: 0 };
+  }
+
+  const score = present.reduce((a, b) => a + b, 0) / present.length;
+  return { score, reasons, presentCount: present.length };
+}
+
+// === Hard filters ===
+
+function passesHardFilters(
+  profile: Profile,
+  listing: ListingWithAttrs,
+  effectiveGross: number
+): boolean {
+  if (profile.budgetMax != null && effectiveGross > profile.budgetMax * BUDGET_CEILING_MULT) {
+    return false;
+  }
+
+  if (profile.cities.length > 0) {
+    let withinCeiling = false;
+    const ceiling = profile.radiusKm * RADIUS_CEILING_MULT;
+    for (const pc of profile.cities) {
+      const coords = getCityCoords(pc);
+      if (!coords) {
+        if (listing.city && pc.toLowerCase().trim() === listing.city.toLowerCase().trim()) {
+          withinCeiling = true;
+          break;
+        }
+        continue;
+      }
+      if (listing.lat != null && listing.lng != null) {
+        const dist = haversine(coords[0], coords[1], listing.lat, listing.lng);
+        if (dist <= ceiling) {
+          withinCeiling = true;
+          break;
+        }
+      } else if (listing.city && pc.toLowerCase().trim() === listing.city.toLowerCase().trim()) {
+        withinCeiling = true;
+        break;
+      }
+    }
+    if (!withinCeiling) return false;
+  }
+
+  if (profile.roomsMin != null && listing.numberOfRooms != null) {
+    if (profile.roomsMin - listing.numberOfRooms > ROOMS_HARD_DEFICIT) return false;
+  }
+
+  if (profile.moveInFrom != null && listing.movingDate != null) {
+    const diff = diffDays(listing.movingDate, profile.moveInFrom);
+    if (diff > 0) {
+      const maxLate = DATE_MAX_LATE + (profile.moveInFlexible ? DATE_FLEX_BONUS_MAX_LATE : 0);
+      if (diff > maxLate) return false;
     }
   }
 
-  if (maxPossible === 0) return [0.5, ["No text attributes to compare"]];
-  const score = (total + maxPossible) / (2 * maxPossible);
-  return [score, reasons];
+  return true;
 }
 
 function computeMatch(
@@ -212,64 +331,69 @@ function computeMatch(
   rationale: string;
   listingSnapshot: Prisma.JsonObject;
 } | null {
-  // Compute effective gross rent (treat 0 as missing)
   const effectiveGross =
-    (listing.rentGross != null && listing.rentGross > 0)
+    listing.rentGross != null && listing.rentGross > 0
       ? listing.rentGross
-      : (listing.rentNet != null && listing.rentNet > 0)
+      : listing.rentNet != null && listing.rentNet > 0
         ? listing.rentNet + (listing.rentCharges ?? 0)
         : null;
 
-  // Hard filter: exclude listings with no rent info
   if (effectiveGross == null) return null;
-
-  // Hard filter: skip listings over budget
-  if (profile.budgetMax != null && effectiveGross > profile.budgetMax) {
-    return null;
-  }
-
-  // Hard filter: skip listings outside radius of all preferred cities
-  if (profile.cities.length > 0) {
-    let withinRadius = false;
-    for (const pc of profile.cities) {
-      const coords = CITY_COORDS[pc.toLowerCase().trim()];
-      if (coords && listing.lat != null && listing.lng != null) {
-        const dist = haversine(coords[0], coords[1], listing.lat, listing.lng);
-        if (dist <= profile.radiusKm) {
-          withinRadius = true;
-          break;
-        }
-      } else if (
-        listing.city &&
-        pc.toLowerCase().trim() === listing.city.toLowerCase().trim()
-      ) {
-        withinRadius = true;
-        break;
-      }
-    }
-    if (!withinRadius) return null;
-  }
+  if (!passesHardFilters(profile, listing, effectiveGross)) return null;
 
   const [ps, pr] = priceScore(effectiveGross, profile.budgetMax);
   const [ls, lr] = locationScore(listing.lat, listing.lng, listing.city, profile.cities, profile.radiusKm);
   const [rs, rr] = roomsScore(listing.numberOfRooms, profile.roomsMin);
   const [ds, dr] = dateScore(listing.movingDate, profile.moveInFrom, profile.moveInFlexible);
 
-  const l1 = PRICE_W * ps + LOCATION_W * ls + ROOMS_W * rs + DATE_W * ds;
-  const [l2, l2Reasons] = layer2Score(profile, listing.attributes);
-  const final = L1_WEIGHT * l1 + L2_WEIGHT * l2;
+  const l1Pairs: [number, number][] = [];
+  if (ps != null) l1Pairs.push([ps, PRICE_W]);
+  if (ls != null) l1Pairs.push([ls, LOCATION_W]);
+  if (rs != null) l1Pairs.push([rs, ROOMS_W]);
+  if (ds != null) l1Pairs.push([ds, DATE_W]);
+
+  let l1: number | null = null;
+  if (l1Pairs.length > 0) {
+    const totalW = l1Pairs.reduce((a, [, w]) => a + w, 0);
+    l1 = l1Pairs.reduce((a, [s, w]) => a + s * w, 0) / totalW;
+  }
+
+  const { score: l2, reasons: l2Reasons, presentCount: l2Present } = layer2Score(profile, listing.attributes);
+
+  if (l1 == null && l2 == null) return null;
+
+  let final: number;
+  let coverage = 0;
+  if (l2 == null || l2Present === 0) {
+    final = l1 ?? 0;
+  } else if (l1 == null) {
+    coverage = l2Present / L2_ATTRIBUTE_COUNT;
+    final = l2;
+  } else {
+    coverage = l2Present / L2_ATTRIBUTE_COUNT;
+    const w2 = L2_BASE_WEIGHT * coverage;
+    const w1 = 1 - w2;
+    final = w1 * l1 + w2 * l2;
+  }
 
   if (final < MATCH_SCORE_THRESHOLD) return null;
 
+  const l1PresentCount = [ps, ls, rs, ds].filter((s) => s != null).length;
+  const completeness = (l1PresentCount + l2Present) / (L1_SUBSCORE_COUNT + L2_ATTRIBUTE_COUNT);
+
+  const round4 = (v: number) => Math.round(v * 10000) / 10000;
+
   return {
-    score: Math.round(final * 10000) / 10000,
+    score: round4(final),
     scoreBreakdown: {
-      l1: Math.round(l1 * 10000) / 10000,
-      l2: Math.round(l2 * 10000) / 10000,
-      price: Math.round(ps * 10000) / 10000,
-      location: Math.round(ls * 10000) / 10000,
-      rooms: Math.round(rs * 10000) / 10000,
-      date: Math.round(ds * 10000) / 10000,
+      l1: l1 != null ? round4(l1) : null,
+      l2: l2 != null ? round4(l2) : null,
+      price: ps != null ? round4(ps) : null,
+      location: ls != null ? round4(ls) : null,
+      rooms: rs != null ? round4(rs) : null,
+      date: ds != null ? round4(ds) : null,
+      coverage: round4(coverage),
+      completeness: round4(completeness),
     } as Prisma.JsonObject,
     rationale: [pr, lr, rr, dr, ...l2Reasons].join(", "),
     listingSnapshot: {
@@ -281,6 +405,9 @@ function computeMatch(
     } as Prisma.JsonObject,
   };
 }
+
+// Suppress unused-import warning for L1_BASE_WEIGHT (kept for documentation).
+void L1_BASE_WEIGHT;
 
 export async function runMatchingForUser(userId: string): Promise<number> {
   const profile = await prisma.userProfile.findUnique({

@@ -9,7 +9,7 @@ import psycopg2
 from psycopg2.extras import execute_values
 
 from flatfox_worker.config import settings
-from flatfox_worker.matcher import _haversine
+from flatfox_worker.matcher import BUDGET_CEILING_MULT, RADIUS_CEILING_MULT, _haversine
 from flatfox_worker.pii import strip_pii
 
 logger = logging.getLogger(__name__)
@@ -125,13 +125,14 @@ def _could_match_any_profile(
     city = listing.get("city")
 
     for p in profiles:
-        # Budget check: MUST pass
-        if p["budget_max"] is not None and effective_gross > p["budget_max"]:
+        # Budget check: v2 ceiling (budget_max × 1.30)
+        if p["budget_max"] is not None and effective_gross > p["budget_max"] * BUDGET_CEILING_MULT:
             continue
 
-        # Location check: MUST pass
+        # Location check: v2 ceiling (radius_km × 2)
         if p["cities"]:
             location_ok = False
+            ceiling = p["radius_km"] * RADIUS_CEILING_MULT
             for pc in p["cities"]:
                 coords = CITY_COORDS.get(pc.lower().strip())
                 if coords is None:
@@ -141,7 +142,7 @@ def _could_match_any_profile(
                     continue
                 if lat is not None and lng is not None:
                     dist = _haversine(coords[0], coords[1], lat, lng)
-                    if dist <= p["radius_km"]:
+                    if dist <= ceiling:
                         location_ok = True
                         break
                 elif city and pc.lower().strip() == city.lower().strip():

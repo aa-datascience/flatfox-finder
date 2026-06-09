@@ -50,7 +50,7 @@ interface Attributes {
 interface MatchData {
   id: string;
   score: number;
-  scoreBreakdown: Record<string, number>;
+  scoreBreakdown: Record<string, number | null>;
   rationale: string | null;
   status: string;
   listingSnapshot: Record<string, unknown>;
@@ -449,33 +449,66 @@ export default function MatchDetailPage() {
 
       {/* Score breakdown */}
       <div className="card p-6 mb-6">
-        <h2 className="text-sm font-semibold text-gray-900 uppercase tracking-wide mb-4">
-          Match analysis
-        </h2>
+        <div className="flex items-baseline justify-between mb-4">
+          <h2 className="text-sm font-semibold text-gray-900 uppercase tracking-wide">
+            Match analysis
+          </h2>
+          {(() => {
+            const c = match.scoreBreakdown?.completeness;
+            if (typeof c !== "number") return null;
+            const label =
+              c >= 0.95 ? "full profile" : c >= 0.6 ? "partial profile" : "limited info";
+            return (
+              <span className="text-xs text-gray-500">
+                {Math.round(c * 100)}% data · {label}
+              </span>
+            );
+          })()}
+        </div>
         {match.rationale && (
           <p className="text-sm text-gray-600 mb-5">{match.rationale}</p>
         )}
         {match.scoreBreakdown && Object.keys(match.scoreBreakdown).length > 0 && (
           <div className="space-y-3">
-            {Object.entries(match.scoreBreakdown).map(([key, val]) => {
-              const pct = typeof val === "number" ? Math.round(val * 100) : 0;
-              const barColor =
-                pct >= 80 ? "bg-brand-500" : pct >= 50 ? "bg-accent-400" : "bg-gray-300";
-              return (
-                <div key={key}>
-                  <div className="flex items-center justify-between text-sm mb-1">
-                    <span className="text-gray-600 capitalize">{key.replace(/_/g, " ")}</span>
-                    <span className="font-semibold text-gray-900">{pct}%</span>
+            {(() => {
+              const order = ["price", "location", "rooms", "date", "l1", "l2"];
+              const labels: Record<string, string> = {
+                price: "Price",
+                location: "Location",
+                rooms: "Rooms",
+                date: "Move-in date",
+                l1: "Layer 1 (quantitative)",
+                l2: "Layer 2 (lifestyle)",
+              };
+              const entries = order
+                .filter((k) => k in match.scoreBreakdown)
+                .map((k) => [k, match.scoreBreakdown[k]] as const);
+
+              return entries.map(([key, val]) => {
+                const isAbsent = val == null;
+                const pct = typeof val === "number" ? Math.round(val * 100) : 0;
+                const barColor =
+                  pct >= 80 ? "bg-brand-500" : pct >= 50 ? "bg-accent-400" : "bg-gray-300";
+                return (
+                  <div key={key}>
+                    <div className="flex items-center justify-between text-sm mb-1">
+                      <span className="text-gray-600">{labels[key] ?? key}</span>
+                      <span className="font-semibold text-gray-900">
+                        {isAbsent ? <span className="text-gray-400">not compared</span> : `${pct}%`}
+                      </span>
+                    </div>
+                    <div className="h-2 rounded-full bg-gray-100 overflow-hidden">
+                      {!isAbsent && (
+                        <div
+                          className={`h-full rounded-full transition-all ${barColor}`}
+                          style={{ width: `${pct}%` }}
+                        />
+                      )}
+                    </div>
                   </div>
-                  <div className="h-2 rounded-full bg-gray-100 overflow-hidden">
-                    <div
-                      className={`h-full rounded-full transition-all ${barColor}`}
-                      style={{ width: `${pct}%` }}
-                    />
-                  </div>
-                </div>
-              );
-            })}
+                );
+              });
+            })()}
           </div>
         )}
       </div>

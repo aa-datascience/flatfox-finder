@@ -15,11 +15,20 @@ export async function POST(request: NextRequest) {
     return NextResponse.json({ error: "Invalid JSON" }, { status: 400 });
   }
 
-  const { email, password, name, locale } = body;
+  const { password, name, locale } = body;
+  // Normalize so casing/whitespace can't create duplicate or unreachable accounts.
+  const email = body.email?.trim().toLowerCase();
 
   if (!email || !password || !name) {
     return NextResponse.json(
       { error: "email, password, and name are required" },
+      { status: 400 }
+    );
+  }
+
+  if (!/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(email)) {
+    return NextResponse.json(
+      { error: "Please enter a valid email address" },
       { status: 400 }
     );
   }

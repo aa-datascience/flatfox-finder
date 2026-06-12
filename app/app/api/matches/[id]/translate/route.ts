@@ -3,7 +3,11 @@ import { NextRequest, NextResponse } from "next/server";
 import { getSessionUserId, unauthorized, forbidden } from "@/lib/auth";
 import { prisma } from "@/lib/db";
 import { stripPii } from "@/lib/pii";
+import { consumeRateLimit } from "@/lib/rate-limit";
 import { translateDescription } from "@/lib/translate";
+
+const RATE_LIMIT = 60;
+const RATE_WINDOW_MS = 60 * 60 * 1000; // 1 hour
 
 export async function POST(
   _request: NextRequest,
@@ -11,6 +15,14 @@ export async function POST(
 ) {
   const userId = await getSessionUserId();
   if (!userId) return unauthorized();
+
+  const rl = consumeRateLimit(`ai:translate:${userId}`, RATE_LIMIT, RATE_WINDOW_MS);
+  if (!rl.allowed) {
+    return NextResponse.json(
+      { error: "Too many requests. Please try again later." },
+      { status: 429, headers: { "Retry-After": String(rl.retryAfterSec) } }
+    );
+  }
 
   const { id: matchId } = await params;
 
@@ -48,6 +60,9 @@ export async function POST(
   } catch (error) {
     const msg = error instanceof Error ? error.message : String(error);
     console.error("[translate] failed:", msg);
-    return NextResponse.json({ error: msg }, { status: 500 });
+    return NextResponse.json(
+      { error: "Couldn't translate the description right now." },
+      { status: 500 }
+    );
   }
 }

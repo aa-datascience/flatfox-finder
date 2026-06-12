@@ -1,3 +1,4 @@
+import { compare } from "bcrypt";
 import { NextResponse } from "next/server";
 
 import { getSessionUserId, unauthorized } from "@/lib/auth";
@@ -7,12 +8,30 @@ export async function DELETE(request: Request) {
   const userId = await getSessionUserId();
   if (!userId) return unauthorized();
 
-  const { confirm } = await request.json();
+  let body: { password?: string };
+  try {
+    body = await request.json();
+  } catch {
+    return NextResponse.json({ error: "Invalid request" }, { status: 400 });
+  }
 
-  if (confirm !== true) {
+  if (!body.password) {
     return NextResponse.json(
-      { error: "Confirmation required" },
+      { error: "Password is required to delete your account" },
       { status: 400 }
+    );
+  }
+
+  // Re-authenticate before this irreversible, destructive action so a session
+  // left open on a shared device can't be used to wipe the account.
+  const user = await prisma.user.findUnique({ where: { id: userId } });
+  if (!user) return unauthorized();
+
+  const valid = await compare(body.password, user.passwordHash);
+  if (!valid) {
+    return NextResponse.json(
+      { error: "Incorrect password" },
+      { status: 403 }
     );
   }
 

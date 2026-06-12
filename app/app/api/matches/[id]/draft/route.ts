@@ -5,6 +5,7 @@ import { NextRequest, NextResponse } from "next/server";
 import { getSessionUserId, unauthorized, forbidden } from "@/lib/auth";
 import { prisma } from "@/lib/db";
 import { stripPii } from "@/lib/pii";
+import { consumeRateLimit } from "@/lib/rate-limit";
 import {
   buildDraftUserMessage,
   DRAFT_MESSAGE_SYSTEM,
@@ -12,6 +13,9 @@ import {
 } from "@/lib/prompts/draft_message";
 
 const DRAFT_MODEL = "claude-sonnet-4-5-20250929";
+
+const RATE_LIMIT = 30;
+const RATE_WINDOW_MS = 60 * 60 * 1000; // 1 hour
 
 const LOCALE_NAMES: Record<string, string> = {
   en: "English",
@@ -58,6 +62,14 @@ export async function POST(
 ) {
   const userId = await getSessionUserId();
   if (!userId) return unauthorized();
+
+  const rl = consumeRateLimit(`ai:draft:${userId}`, RATE_LIMIT, RATE_WINDOW_MS);
+  if (!rl.allowed) {
+    return NextResponse.json(
+      { error: "Too many message drafts in a short time. Please try again later." },
+      { status: 429, headers: { "Retry-After": String(rl.retryAfterSec) } }
+    );
+  }
 
   const { id: matchId } = await params;
 
@@ -160,6 +172,9 @@ export async function POST(
   } catch (error) {
     const msg = error instanceof Error ? error.message : String(error);
     console.error("[draft] generation failed:", msg);
-    return NextResponse.json({ error: msg }, { status: 500 });
+    return NextResponse.json(
+      { error: "Couldn't draft a message right now. Please try again." },
+      { status: 500 }
+    );
   }
 }

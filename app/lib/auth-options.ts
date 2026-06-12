@@ -16,11 +16,15 @@ export const authOptions: NextAuthOptions = {
       async authorize(credentials) {
         if (!credentials?.email || !credentials?.password) return null;
 
-        const key = `login:${credentials.email.toLowerCase()}`;
+        // Match the normalization applied at signup so login is case- and
+        // whitespace-insensitive.
+        const email = credentials.email.trim().toLowerCase();
+
+        const key = `login:${email}`;
         if (isRateLimited(key)) return null;
 
         const user = await prisma.user.findUnique({
-          where: { email: credentials.email },
+          where: { email },
         });
         if (!user) {
           recordFailedAttempt(key);

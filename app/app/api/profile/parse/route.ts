@@ -2,6 +2,7 @@ import Anthropic from "@anthropic-ai/sdk";
 import { NextResponse } from "next/server";
 
 import { getSessionUserId, unauthorized } from "@/lib/auth";
+import { consumeRateLimit } from "@/lib/rate-limit";
 import { stripPii } from "@/lib/pii";
 import {
   PARSE_PROFILE_SYSTEM,
@@ -10,9 +11,20 @@ import {
 
 const anthropic = new Anthropic();
 
+const RATE_LIMIT = 20;
+const RATE_WINDOW_MS = 60 * 60 * 1000; // 1 hour
+
 export async function POST(request: Request) {
   const userId = await getSessionUserId();
   if (!userId) return unauthorized();
+
+  const rl = consumeRateLimit(`ai:parse:${userId}`, RATE_LIMIT, RATE_WINDOW_MS);
+  if (!rl.allowed) {
+    return NextResponse.json(
+      { error: "Too many requests. Please try again later." },
+      { status: 429, headers: { "Retry-After": String(rl.retryAfterSec) } }
+    );
+  }
 
   const { raw_text } = await request.json();
   if (!raw_text || typeof raw_text !== "string") {

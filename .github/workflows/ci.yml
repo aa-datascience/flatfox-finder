@@ -32,6 +32,25 @@ jobs:
     defaults:
       run:
         working-directory: worker
+
+    services:
+      postgres:
+        image: postgres:16
+        env:
+          POSTGRES_USER: postgres
+          POSTGRES_PASSWORD: postgres
+          POSTGRES_DB: studenthousing
+        ports:
+          - 5432:5432
+        options: >-
+          --health-cmd pg_isready
+          --health-interval 10s
+          --health-timeout 5s
+          --health-retries 5
+
+    env:
+      DATABASE_URL: postgresql://postgres:postgres@localhost:5432/studenthousing
+
     steps:
       - uses: actions/checkout@v4
       - uses: actions/setup-python@v5
@@ -39,5 +58,16 @@ jobs:
           python-version: "3.13"
           cache: pip
       - run: pip install -r requirements.txt pip-audit
+
+      # Bootstrap the DB schema so integration tests can connect.
+      - name: Apply DB migrations
+        run: |
+          PGPASSWORD=postgres psql -h localhost -U postgres -d studenthousing \
+            -f ../shared/init/01-extensions.sql
+          PGPASSWORD=postgres psql -h localhost -U postgres -d studenthousing \
+            -f ../shared/migrations/20260604210810_init.sql
+          PGPASSWORD=postgres psql -h localhost -U postgres -d studenthousing \
+            -f ../shared/migrations/20260606120000_add_message_language.sql
+
       - run: python -m pytest -q
       - run: pip-audit

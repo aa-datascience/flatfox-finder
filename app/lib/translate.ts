@@ -72,30 +72,68 @@ export interface TranslationResult {
   wasTranslated: boolean;
 }
 
+// A description translated to a given language is deterministic, so cache the
+// result. The match-detail page asks for a translation on every open, and the
+// underlying (unofficial) Google Translate call is slow and rate-limit-prone —
+// this collapses repeat views of the same listing into a single call.
+//
+// In-process and per-instance: it survives only for the lifetime of the server
+// process. A shared/persistent cache (e.g. a listing_translations table) is the
+// durable version of this.
+const CACHE_MAX = 500;
+const cache = new Map<string, TranslationResult>();
+
+function cacheGet(key: string): TranslationResult | undefined {
+  const hit = cache.get(key);
+  if (hit !== undefined) {
+    // Refresh recency for simple LRU eviction.
+    cache.delete(key);
+    cache.set(key, hit);
+  }
+  return hit;
+}
+
+function cacheSet(key: string, value: TranslationResult): void {
+  cache.set(key, value);
+  if (cache.size > CACHE_MAX) {
+    const oldest = cache.keys().next().value;
+    if (oldest !== undefined) cache.delete(oldest);
+  }
+}
+
 export async function translateDescription(
   description: string,
   targetLang: string
 ): Promise<TranslationResult> {
+  const cacheKey = `${targetLang}::${description}`;
+  const cached = cacheGet(cacheKey);
+  if (cached !== undefined) return cached;
+
   const chunks = splitBilingual(description);
   const bestChunk = pickBestChunk(chunks, targetLang);
   const detectedLang = detectLang(bestChunk);
 
   if (detectedLang === targetLang) {
-    return {
+    const result: TranslationResult = {
       text: bestChunk,
       originalLanguage: detectedLang,
       wasTranslated: false,
     };
+    cacheSet(cacheKey, result);
+    return result;
   }
 
   try {
     const result = await translate(bestChunk, { to: targetLang });
-    return {
+    const out: TranslationResult = {
       text: result.text,
       originalLanguage: detectedLang,
       wasTranslated: true,
     };
+    cacheSet(cacheKey, out);
+    return out;
   } catch {
+    // Don't cache failures — let the next view retry.
     return {
       text: bestChunk,
       originalLanguage: detectedLang,

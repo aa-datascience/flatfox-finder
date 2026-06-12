@@ -17,6 +17,10 @@ export async function GET(request: NextRequest) {
   const where: Record<string, unknown> = { userId };
   if (statusFilter) {
     where.status = { in: statusFilter.split(",") };
+  } else {
+    // Default ("All") view hides dismissed matches — they're still reachable
+    // via the explicit "Dismissed" filter.
+    where.status = { not: "dismissed" };
   }
 
   const orderBy =

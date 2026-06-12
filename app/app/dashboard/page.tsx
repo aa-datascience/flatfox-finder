@@ -82,21 +82,25 @@ export default function DashboardPage() {
     fetchMatches();
   }, [fetchMatches]);
 
-  const handleDismiss = async (matchId: string) => {
+  const setStatus = async (matchId: string, status: string) => {
     try {
       const res = await fetch(`/api/matches/${matchId}`, {
         method: "PATCH",
         headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ status: "dismissed" }),
+        body: JSON.stringify({ status }),
       });
       if (!res.ok) throw new Error();
       setMatches((prev) =>
-        prev.map((m) => (m.id === matchId ? { ...m, status: "dismissed" } : m))
+        prev.map((m) => (m.id === matchId ? { ...m, status } : m))
       );
     } catch {
       /* silent */
     }
   };
+
+  const handleDismiss = (matchId: string) => setStatus(matchId, "dismissed");
+  // Un-dismissing returns the match to "seen" (it's been looked at, not new).
+  const handleUndismiss = (matchId: string) => setStatus(matchId, "seen");
 
   const totalPages = Math.ceil(total / limit);
 
@@ -152,6 +156,7 @@ export default function DashboardPage() {
                 key={match.id}
                 match={match}
                 onDismiss={() => handleDismiss(match.id)}
+                onUndismiss={() => handleUndismiss(match.id)}
               />
             ))}
           </div>
@@ -206,9 +211,11 @@ function EmptyState({ filter }: { filter: StatusFilter }) {
 function MatchCard({
   match,
   onDismiss,
+  onUndismiss,
 }: {
   match: Match;
   onDismiss: () => void;
+  onUndismiss: () => void;
 }) {
   const listing = match.listing;
   const snapshot = match.listingSnapshot as Record<string, unknown>;
@@ -327,7 +334,19 @@ function MatchCard({
             </button>
           )}
           {match.status === "dismissed" && (
-            <span className="text-xs text-gray-400">Dismissed</span>
+            <span className="flex items-center gap-1.5 text-xs text-gray-400">
+              Dismissed
+              <button
+                onClick={(e) => {
+                  e.preventDefault();
+                  e.stopPropagation();
+                  onUndismiss();
+                }}
+                className="font-medium text-brand-600 transition-colors hover:text-brand-700"
+              >
+                Undo
+              </button>
+            </span>
           )}
         </div>
       </div>

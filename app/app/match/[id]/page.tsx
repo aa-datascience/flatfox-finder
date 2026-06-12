@@ -77,6 +77,7 @@ export default function MatchDetailPage() {
   const [showEditor, setShowEditor] = useState(false);
   const [saving, setSaving] = useState(false);
   const [copied, setCopied] = useState(false);
+  const [copyFailed, setCopyFailed] = useState(false);
   const textareaRef = useRef<HTMLTextAreaElement>(null);
 
   const [translatedDesc, setTranslatedDesc] = useState<string | null>(null);
@@ -167,9 +168,12 @@ export default function MatchDetailPage() {
     try {
       await navigator.clipboard.writeText(draft);
       setCopied(true);
+      setCopyFailed(false);
       setTimeout(() => setCopied(false), 2000);
     } catch {
-      /* clipboard may fail in some contexts */
+      // Clipboard API can be blocked (permissions, non-secure context). Tell the
+      // user so they can copy manually instead of pasting nothing on Flatfox.
+      setCopyFailed(true);
     }
 
     window.open(`https://flatfox.ch${data.listing.url}`, "_blank");
@@ -293,12 +297,16 @@ export default function MatchDetailPage() {
             {images.length > 1 && (
               <>
                 <button
+                  type="button"
+                  aria-label="Previous photo"
                   onClick={() => setActiveImg((i) => (i - 1 + images.length) % images.length)}
                   className="absolute left-2 top-1/2 -translate-y-1/2 rounded-full bg-black/40 p-2 text-white hover:bg-black/60 transition-colors"
                 >
                   <svg className="h-5 w-5" viewBox="0 0 20 20" fill="currentColor"><path fillRule="evenodd" d="M12.79 5.23a.75.75 0 01-.02 1.06L8.832 10l3.938 3.71a.75.75 0 11-1.04 1.08l-4.5-4.25a.75.75 0 010-1.08l4.5-4.25a.75.75 0 011.06.02z" clipRule="evenodd" /></svg>
                 </button>
                 <button
+                  type="button"
+                  aria-label="Next photo"
                   onClick={() => setActiveImg((i) => (i + 1) % images.length)}
                   className="absolute right-2 top-1/2 -translate-y-1/2 rounded-full bg-black/40 p-2 text-white hover:bg-black/60 transition-colors"
                 >
@@ -315,6 +323,9 @@ export default function MatchDetailPage() {
               {images.map((img, i) => (
                 <button
                   key={i}
+                  type="button"
+                  aria-label={`View photo ${i + 1}`}
+                  aria-current={i === activeImg}
                   onClick={() => setActiveImg(i)}
                   className={`shrink-0 rounded-lg overflow-hidden border-2 transition-all ${
                     i === activeImg ? "border-brand-500 shadow-sm" : "border-transparent opacity-60 hover:opacity-100"
@@ -634,6 +645,12 @@ export default function MatchDetailPage() {
                   {drafting ? "Regenerating..." : "Regenerate"}
                 </button>
               </div>
+              {copyFailed && (
+                <p className="mt-3 text-sm text-amber-700">
+                  We couldn&apos;t copy to your clipboard automatically. Select the
+                  message above and copy it manually before sending on Flatfox.
+                </p>
+              )}
             </div>
           )}
         </div>

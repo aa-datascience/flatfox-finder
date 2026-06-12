@@ -3,40 +3,18 @@
 import { signOut, useSession } from "next-auth/react";
 import { useEffect, useState } from "react";
 
-const CITY_OPTIONS = [
-  "Zürich", "Lausanne", "Genève", "Basel", "Bern", "Winterthur",
-  "Luzern", "St. Gallen", "Lugano", "Fribourg", "Neuchâtel",
-];
-const LANGUAGE_OPTIONS = ["DE", "FR", "EN", "IT"];
-const VIBE_OPTIONS = ["quiet", "social", "mixed"] as const;
-const GENDER_PREF_OPTIONS = ["any", "female_only", "male_only"] as const;
-const MESSAGE_LANG_OPTIONS = [
-  { value: "english", label: "Always in English" },
-  { value: "my_language", label: "My language (if it matches the listing)" },
-  { value: "description", label: "Language of the listing description" },
-] as const;
-const LOCALE_OPTIONS = [
-  { value: "de", label: "Deutsch" },
-  { value: "fr", label: "Français" },
-  { value: "en", label: "English" },
-  { value: "it", label: "Italiano" },
-];
+import {
+  Field,
+  FieldGroup,
+  LivingPreferenceFields,
+  LOCALE_OPTIONS,
+  MESSAGE_LANG_OPTIONS,
+  SearchCriteriaFields,
+  type ProfileFieldsValue,
+} from "@/components/profile/fields";
 
-interface ProfileData {
+interface ProfileData extends ProfileFieldsValue {
   study_program: string;
-  budget_max: string;
-  cities: string[];
-  radius_km: string;
-  rooms_min: string;
-  move_in_from: string;
-  move_in_flexible: boolean;
-  furnished_pref: boolean | null;
-  max_flatmates: string;
-  languages: string[];
-  vibe: string;
-  pets_ok: boolean | null;
-  smoking_ok: boolean | null;
-  gender_pref: string;
   message_language: string;
   raw_text: string;
 }
@@ -78,6 +56,8 @@ export default function SettingsPage() {
   const [pwMsg, setPwMsg] = useState<{ type: "ok" | "err"; text: string } | null>(null);
 
   const [deleteConfirm, setDeleteConfirm] = useState(false);
+  const [deletePassword, setDeletePassword] = useState("");
+  const [deleteError, setDeleteError] = useState<string | null>(null);
   const [deleting, setDeleting] = useState(false);
 
   useEffect(() => {
@@ -119,14 +99,9 @@ export default function SettingsPage() {
     load();
   }, []);
 
-  const toggleArray = (field: "cities" | "languages", value: string) => {
-    setProfile((prev) => ({
-      ...prev,
-      [field]: prev[field].includes(value)
-        ? prev[field].filter((v) => v !== value)
-        : [...prev[field], value],
-    }));
-  };
+  // Merge a partial update from the shared field groups into profile state.
+  const patchProfile = (patch: Partial<ProfileFieldsValue>) =>
+    setProfile((prev) => ({ ...prev, ...patch }));
 
   const handleSaveProfile = async () => {
     setProfileSaving(true);
@@ -193,15 +168,22 @@ export default function SettingsPage() {
 
   const handleDeleteAccount = async () => {
     setDeleting(true);
+    setDeleteError(null);
     try {
       const res = await fetch("/api/account", {
         method: "DELETE",
         headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ confirm: true }),
+        body: JSON.stringify({ password: deletePassword }),
       });
-      if (!res.ok) throw new Error();
+      if (!res.ok) {
+        const data = await res.json().catch(() => ({}));
+        setDeleteError(data.error ?? "Could not delete account.");
+        setDeleting(false);
+        return;
+      }
       await signOut({ callbackUrl: "/" });
     } catch {
+      setDeleteError("Something went wrong. Please try again.");
       setDeleting(false);
     }
   };
@@ -247,8 +229,9 @@ export default function SettingsPage() {
               <div className="card p-6">
                 <SectionTitle>Personal information</SectionTitle>
                 <div className="space-y-4">
-                  <Field label="Name">
+                  <Field label="Name" htmlFor="set-name">
                     <input
+                      id="set-name"
                       type="text"
                       value={name}
                       onChange={(e) => setName(e.target.value)}
@@ -257,15 +240,21 @@ export default function SettingsPage() {
                   </Field>
 
                   <div className="grid grid-cols-2 gap-4">
-                    <Field label="Preferred language">
-                      <select value={locale} onChange={(e) => setLocale(e.target.value)} className="input">
+                    <Field label="Preferred language" htmlFor="set-locale">
+                      <select
+                        id="set-locale"
+                        value={locale}
+                        onChange={(e) => setLocale(e.target.value)}
+                        className="input"
+                      >
                         {LOCALE_OPTIONS.map((o) => (
                           <option key={o.value} value={o.value}>{o.label}</option>
                         ))}
                       </select>
                     </Field>
-                    <Field label="Study program">
+                    <Field label="Study program" htmlFor="set-study">
                       <input
+                        id="set-study"
                         type="text"
                         value={profile.study_program}
                         onChange={(e) => setProfile({ ...profile, study_program: e.target.value })}
@@ -274,15 +263,19 @@ export default function SettingsPage() {
                     </Field>
                   </div>
 
-                  <Field label="About me">
+                  <Field
+                    label="About me"
+                    htmlFor="set-about"
+                    hint="This text is included when AI drafts your messages."
+                  >
                     <textarea
+                      id="set-about"
                       value={profile.raw_text}
                       onChange={(e) => setProfile({ ...profile, raw_text: e.target.value })}
                       className="input"
                       rows={3}
                       placeholder="Used to personalize your contact messages. E.g. I'm a tidy, quiet person who loves cooking..."
                     />
-                    <p className="text-xs text-gray-400 mt-1">This text is included when AI drafts your messages.</p>
                   </Field>
                 </div>
               </div>
@@ -290,163 +283,19 @@ export default function SettingsPage() {
               {/* Search criteria card */}
               <div className="card p-6">
                 <SectionTitle>Search criteria</SectionTitle>
-                <div className="space-y-4">
-                  <div className="grid grid-cols-2 gap-4">
-                    <Field label="Budget (max CHF/mo)">
-                      <input
-                        type="number"
-                        value={profile.budget_max}
-                        onChange={(e) => setProfile({ ...profile, budget_max: e.target.value })}
-                        className="input"
-                        min={0}
-                      />
-                    </Field>
-                    <Field label="Min rooms">
-                      <input
-                        type="number"
-                        value={profile.rooms_min}
-                        onChange={(e) => setProfile({ ...profile, rooms_min: e.target.value })}
-                        className="input"
-                        min={1}
-                        max={10}
-                        step={0.5}
-                      />
-                    </Field>
-                  </div>
-
-                  <Field label="Cities">
-                    <div className="flex flex-wrap gap-2">
-                      {CITY_OPTIONS.map((c) => (
-                        <Chip
-                          key={c}
-                          label={c}
-                          active={profile.cities.includes(c)}
-                          onClick={() => toggleArray("cities", c)}
-                        />
-                      ))}
-                    </div>
-                  </Field>
-
-                  <Field label="Radius (km)">
-                    <div className="flex items-center gap-3">
-                      <input
-                        type="range"
-                        min={1}
-                        max={50}
-                        value={profile.radius_km}
-                        onChange={(e) => setProfile({ ...profile, radius_km: e.target.value })}
-                        className="flex-1 accent-brand-600"
-                      />
-                      <span className="text-sm font-medium text-gray-700 bg-gray-100 rounded-md px-2.5 py-1 min-w-[3.5rem] text-center">
-                        {profile.radius_km} km
-                      </span>
-                    </div>
-                  </Field>
-
-                  <div className="grid grid-cols-2 gap-4">
-                    <Field label="Move-in from">
-                      <input
-                        type="date"
-                        value={profile.move_in_from}
-                        onChange={(e) => setProfile({ ...profile, move_in_from: e.target.value })}
-                        className="input"
-                      />
-                    </Field>
-                    <Field label="Flexible on date?">
-                      <div className="pt-1.5">
-                        <Toggle
-                          checked={profile.move_in_flexible}
-                          onChange={(v) => setProfile({ ...profile, move_in_flexible: v })}
-                        />
-                      </div>
-                    </Field>
-                  </div>
-
-                  <div className="grid grid-cols-2 gap-4">
-                    <Field label="Furnished?">
-                      <TriToggle
-                        value={profile.furnished_pref}
-                        onChange={(v) => setProfile({ ...profile, furnished_pref: v })}
-                      />
-                    </Field>
-                    <Field label="Max flatmates">
-                      <input
-                        type="number"
-                        value={profile.max_flatmates}
-                        onChange={(e) => setProfile({ ...profile, max_flatmates: e.target.value })}
-                        className="input"
-                        min={0}
-                      />
-                    </Field>
-                  </div>
-                </div>
+                <SearchCriteriaFields value={profile} onChange={patchProfile} />
               </div>
 
               {/* Preferences card */}
               <div className="card p-6">
                 <SectionTitle>Living preferences</SectionTitle>
-                <div className="space-y-4">
-                  <Field label="Languages spoken">
-                    <div className="flex flex-wrap gap-2">
-                      {LANGUAGE_OPTIONS.map((l) => (
-                        <Chip
-                          key={l}
-                          label={l}
-                          active={profile.languages.includes(l)}
-                          onClick={() => toggleArray("languages", l)}
-                        />
-                      ))}
-                    </div>
-                  </Field>
-
-                  <Field label="Vibe">
-                    <div className="flex gap-2">
-                      {VIBE_OPTIONS.map((v) => (
-                        <Chip
-                          key={v}
-                          label={v.charAt(0).toUpperCase() + v.slice(1)}
-                          active={profile.vibe === v}
-                          onClick={() => setProfile({ ...profile, vibe: profile.vibe === v ? "" : v })}
-                        />
-                      ))}
-                    </div>
-                  </Field>
-
-                  <div className="grid grid-cols-3 gap-4">
-                    <Field label="Pets OK?">
-                      <TriToggle
-                        value={profile.pets_ok}
-                        onChange={(v) => setProfile({ ...profile, pets_ok: v })}
-                      />
-                    </Field>
-                    <Field label="Smoking OK?">
-                      <TriToggle
-                        value={profile.smoking_ok}
-                        onChange={(v) => setProfile({ ...profile, smoking_ok: v })}
-                      />
-                    </Field>
-                    <Field label="Gender pref.">
-                      <div className="flex flex-wrap gap-1.5">
-                        {GENDER_PREF_OPTIONS.map((g) => (
-                          <Chip
-                            key={g}
-                            label={g === "any" ? "Any" : g === "female_only" ? "F" : "M"}
-                            active={profile.gender_pref === g}
-                            onClick={() =>
-                              setProfile({ ...profile, gender_pref: profile.gender_pref === g ? "" : g })
-                            }
-                          />
-                        ))}
-                      </div>
-                    </Field>
-                  </div>
-                </div>
+                <LivingPreferenceFields value={profile} onChange={patchProfile} />
               </div>
 
               {/* Message settings card */}
               <div className="card p-6">
                 <SectionTitle>Message settings</SectionTitle>
-                <Field label="Contact message language">
+                <FieldGroup label="Contact message language">
                   <div className="flex flex-col gap-2.5">
                     {MESSAGE_LANG_OPTIONS.map((o) => (
                       <label key={o.value} className="flex items-center gap-2.5 text-sm cursor-pointer">
@@ -462,7 +311,7 @@ export default function SettingsPage() {
                       </label>
                     ))}
                   </div>
-                </Field>
+                </FieldGroup>
               </div>
 
               {/* Save button */}
@@ -490,25 +339,28 @@ export default function SettingsPage() {
         <div className="card p-6 max-w-md">
           <SectionTitle>Change password</SectionTitle>
           <form onSubmit={handleChangePassword} className="space-y-4">
-            <Field label="Current password">
+            <Field label="Current password" htmlFor="pw-old">
               <input
+                id="pw-old"
                 type="password"
                 value={oldPassword}
                 onChange={(e) => setOldPassword(e.target.value)}
                 className="input"
+                autoComplete="current-password"
                 required
               />
             </Field>
-            <Field label="New password">
+            <Field label="New password" htmlFor="pw-new" hint="Minimum 8 characters.">
               <input
+                id="pw-new"
                 type="password"
                 value={newPassword}
                 onChange={(e) => setNewPassword(e.target.value)}
                 className="input"
+                autoComplete="new-password"
                 minLength={8}
                 required
               />
-              <p className="text-xs text-gray-400 mt-1">Minimum 8 characters.</p>
             </Field>
 
             {pwMsg && (
@@ -544,18 +396,33 @@ export default function SettingsPage() {
             ) : (
               <div className="space-y-3">
                 <p className="text-sm font-medium text-red-800">
-                  Are you absolutely sure?
+                  Are you absolutely sure? Enter your password to confirm.
                 </p>
+                <input
+                  type="password"
+                  value={deletePassword}
+                  onChange={(e) => setDeletePassword(e.target.value)}
+                  className="input"
+                  placeholder="Your password"
+                  autoComplete="current-password"
+                />
+                {deleteError && (
+                  <p className="text-sm text-red-700">{deleteError}</p>
+                )}
                 <div className="flex gap-3">
                   <button
                     onClick={handleDeleteAccount}
-                    disabled={deleting}
+                    disabled={deleting || !deletePassword}
                     className="rounded-lg bg-red-600 px-4 py-2 text-sm font-medium text-white hover:bg-red-700 disabled:opacity-50 transition-colors"
                   >
                     {deleting ? "Deleting..." : "Yes, delete everything"}
                   </button>
                   <button
-                    onClick={() => setDeleteConfirm(false)}
+                    onClick={() => {
+                      setDeleteConfirm(false);
+                      setDeletePassword("");
+                      setDeleteError(null);
+                    }}
                     className="btn-secondary"
                   >
                     Cancel
@@ -586,74 +453,5 @@ function SectionTitle({ children }: { children: React.ReactNode }) {
     <h2 className="text-sm font-semibold text-gray-900 uppercase tracking-wide mb-4">
       {children}
     </h2>
-  );
-}
-
-function Field({ label, children }: { label: string; children: React.ReactNode }) {
-  return (
-    <div>
-      <label className="mb-1.5 block text-sm font-medium text-gray-600">{label}</label>
-      {children}
-    </div>
-  );
-}
-
-function Chip({ label, active, onClick }: { label: string; active: boolean; onClick: () => void }) {
-  return (
-    <button
-      type="button"
-      onClick={onClick}
-      className={`rounded-lg border px-3 py-1.5 text-sm font-medium transition-all ${
-        active
-          ? "border-brand-500 bg-brand-50 text-brand-700 shadow-sm"
-          : "border-gray-200 text-gray-600 hover:border-gray-300 hover:bg-gray-50"
-      }`}
-    >
-      {label}
-    </button>
-  );
-}
-
-function Toggle({ checked, onChange }: { checked: boolean; onChange: (v: boolean) => void }) {
-  return (
-    <button
-      type="button"
-      onClick={() => onChange(!checked)}
-      className={`relative inline-flex h-6 w-11 items-center rounded-full transition-colors ${
-        checked ? "bg-brand-600" : "bg-gray-300"
-      }`}
-    >
-      <span
-        className={`inline-block h-4 w-4 transform rounded-full bg-white shadow transition-transform ${
-          checked ? "translate-x-6" : "translate-x-1"
-        }`}
-      />
-    </button>
-  );
-}
-
-function TriToggle({
-  value,
-  onChange,
-}: {
-  value: boolean | null;
-  onChange: (v: boolean | null) => void;
-}) {
-  const options: Array<{ val: boolean | null; label: string }> = [
-    { val: null, label: "Any" },
-    { val: true, label: "Yes" },
-    { val: false, label: "No" },
-  ];
-  return (
-    <div className="flex gap-1.5">
-      {options.map((opt) => (
-        <Chip
-          key={opt.label}
-          label={opt.label}
-          active={value === opt.val}
-          onClick={() => onChange(opt.val)}
-        />
-      ))}
-    </div>
   );
 }

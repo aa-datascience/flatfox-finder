@@ -4,47 +4,19 @@ import { useSession } from "next-auth/react";
 import { useRouter } from "next/navigation";
 import { useCallback, useEffect, useState } from "react";
 
-const CITY_OPTIONS = [
-  "Zürich",
-  "Lausanne",
-  "Genève",
-  "Basel",
-  "Bern",
-  "Winterthur",
-  "Luzern",
-  "St. Gallen",
-  "Lugano",
-  "Fribourg",
-  "Neuchâtel",
-];
-const LANGUAGE_OPTIONS = ["DE", "FR", "EN", "IT"];
-const VIBE_OPTIONS = ["quiet", "social", "mixed"] as const;
-const GENDER_PREF_OPTIONS = ["any", "female_only", "male_only"] as const;
-const LOCALE_OPTIONS = [
-  { value: "de", label: "Deutsch" },
-  { value: "fr", label: "Français" },
-  { value: "en", label: "English" },
-  { value: "it", label: "Italiano" },
-];
+import {
+  Field,
+  LivingPreferenceFields,
+  LOCALE_OPTIONS,
+  SearchCriteriaFields,
+  type ProfileFieldsValue,
+} from "@/components/profile/fields";
 
-interface FormData {
+interface FormData extends ProfileFieldsValue {
   name: string;
   study_program: string;
   locale: string;
-  budget_max: string;
-  cities: string[];
   other_city: string;
-  radius_km: string;
-  rooms_min: string;
-  move_in_from: string;
-  move_in_flexible: boolean;
-  furnished_pref: boolean | null;
-  max_flatmates: string;
-  languages: string[];
-  vibe: string;
-  pets_ok: boolean | null;
-  smoking_ok: boolean | null;
-  gender_pref: string;
   raw_text: string;
 }
 
@@ -118,17 +90,9 @@ export default function OnboardingPage() {
     }
   }, [session]);
 
-  const toggleArrayField = (
-    field: "cities" | "languages",
-    value: string
-  ) => {
-    setForm((prev) => ({
-      ...prev,
-      [field]: prev[field].includes(value)
-        ? prev[field].filter((v) => v !== value)
-        : [...prev[field], value],
-    }));
-  };
+  // Merge a partial update from the shared field groups into form state.
+  const patchForm = (patch: Partial<ProfileFieldsValue>) =>
+    setForm((prev) => ({ ...prev, ...patch }));
 
   const buildMergedProfile = useCallback(
     async (formData: FormData): Promise<MergedProfile> => {
@@ -355,16 +319,13 @@ export default function OnboardingPage() {
         )}
 
         <div className="mt-6 flex gap-3">
-          <button
-            onClick={() => setStep("form")}
-            className="rounded-md border border-gray-300 px-4 py-2 text-sm font-medium text-gray-700 hover:bg-gray-50"
-          >
+          <button onClick={() => setStep("form")} className="btn-secondary">
             Back to edit
           </button>
           <button
             onClick={handleSave}
             disabled={saving}
-            className="rounded-md bg-blue-600 px-4 py-2 text-sm font-medium text-white hover:bg-blue-700 disabled:opacity-50"
+            className="btn-primary"
           >
             {saving ? "Saving…" : "Save & continue"}
           </button>
@@ -382,8 +343,9 @@ export default function OnboardingPage() {
 
       <div className="space-y-6">
         {/* Name */}
-        <Field label="Name" required>
+        <Field label="Name" htmlFor="ob-name" required>
           <input
+            id="ob-name"
             type="text"
             value={form.name}
             onChange={(e) => setForm({ ...form, name: e.target.value })}
@@ -393,8 +355,9 @@ export default function OnboardingPage() {
         </Field>
 
         {/* Study program */}
-        <Field label="Study program" required>
+        <Field label="Study program" htmlFor="ob-study" required>
           <input
+            id="ob-study"
             type="text"
             value={form.study_program}
             onChange={(e) =>
@@ -406,8 +369,9 @@ export default function OnboardingPage() {
         </Field>
 
         {/* Preferred language */}
-        <Field label="Preferred language" required>
+        <Field label="Preferred language" htmlFor="ob-locale" required>
           <select
+            id="ob-locale"
             value={form.locale}
             onChange={(e) => setForm({ ...form, locale: e.target.value })}
             className="input"
@@ -420,217 +384,31 @@ export default function OnboardingPage() {
           </select>
         </Field>
 
-        {/* Budget */}
-        <Field label="Budget (max CHF/mo)" required>
-          <input
-            type="number"
-            value={form.budget_max}
-            onChange={(e) => setForm({ ...form, budget_max: e.target.value })}
-            className="input"
-            placeholder="e.g. 1500"
-            min={0}
-          />
-        </Field>
+        <SearchCriteriaFields
+          value={form}
+          onChange={patchForm}
+          requiredHints
+          otherCity={form.other_city}
+          onOtherCityChange={(v) =>
+            setForm((prev) => ({ ...prev, other_city: v }))
+          }
+        />
 
-        {/* Cities */}
-        <Field label="City / cities" required>
-          <div className="flex flex-wrap gap-2">
-            {CITY_OPTIONS.map((city) => (
-              <button
-                key={city}
-                type="button"
-                onClick={() => toggleArrayField("cities", city)}
-                className={`rounded-full border px-3 py-1 text-sm ${
-                  form.cities.includes(city)
-                    ? "border-blue-600 bg-blue-50 text-blue-700"
-                    : "border-gray-300 text-gray-700 hover:bg-gray-50"
-                }`}
-              >
-                {city}
-              </button>
-            ))}
-          </div>
-          <input
-            type="text"
-            value={form.other_city}
-            onChange={(e) => setForm({ ...form, other_city: e.target.value })}
-            className="input mt-2"
-            placeholder="Other city…"
-          />
-        </Field>
-
-        {/* Radius */}
-        <Field label="Radius (km)">
-          <input
-            type="range"
-            min={1}
-            max={50}
-            value={form.radius_km}
-            onChange={(e) => setForm({ ...form, radius_km: e.target.value })}
-            className="w-full"
-          />
-          <span className="text-sm text-gray-500">{form.radius_km} km</span>
-        </Field>
-
-        {/* Rooms min */}
-        <Field label="Minimum rooms">
-          <input
-            type="number"
-            value={form.rooms_min}
-            onChange={(e) => setForm({ ...form, rooms_min: e.target.value })}
-            className="input"
-            placeholder="e.g. 2.5"
-            min={1}
-            max={10}
-            step={0.5}
-          />
-        </Field>
-
-        {/* Move-in date */}
-        <Field label="Move-in from" required>
-          <input
-            type="date"
-            value={form.move_in_from}
-            onChange={(e) =>
-              setForm({ ...form, move_in_from: e.target.value })
-            }
-            className="input"
-          />
-        </Field>
-
-        {/* Flexible on date */}
-        <Field label="Flexible on date?">
-          <Toggle
-            checked={form.move_in_flexible}
-            onChange={(v) => setForm({ ...form, move_in_flexible: v })}
-          />
-        </Field>
-
-        {/* Furnished */}
-        <Field label="Furnished?">
-          <TriToggle
-            value={form.furnished_pref}
-            onChange={(v) => setForm({ ...form, furnished_pref: v })}
-            labels={["No preference", "Yes", "No"]}
-          />
-        </Field>
-
-        {/* Max flatmates */}
-        <Field label="Max flatmates">
-          <input
-            type="number"
-            value={form.max_flatmates}
-            onChange={(e) =>
-              setForm({ ...form, max_flatmates: e.target.value })
-            }
-            className="input"
-            placeholder="0 = solo"
-            min={0}
-            max={20}
-          />
-        </Field>
-
-        {/* Languages */}
-        <Field label="Languages">
-          <div className="flex flex-wrap gap-2">
-            {LANGUAGE_OPTIONS.map((lang) => (
-              <button
-                key={lang}
-                type="button"
-                onClick={() => toggleArrayField("languages", lang)}
-                className={`rounded-full border px-3 py-1 text-sm ${
-                  form.languages.includes(lang)
-                    ? "border-blue-600 bg-blue-50 text-blue-700"
-                    : "border-gray-300 text-gray-700 hover:bg-gray-50"
-                }`}
-              >
-                {lang}
-              </button>
-            ))}
-          </div>
-        </Field>
-
-        {/* Vibe */}
-        <Field label="Vibe">
-          <div className="flex gap-2">
-            {VIBE_OPTIONS.map((v) => (
-              <button
-                key={v}
-                type="button"
-                onClick={() =>
-                  setForm({ ...form, vibe: form.vibe === v ? "" : v })
-                }
-                className={`rounded-full border px-3 py-1 text-sm capitalize ${
-                  form.vibe === v
-                    ? "border-blue-600 bg-blue-50 text-blue-700"
-                    : "border-gray-300 text-gray-700 hover:bg-gray-50"
-                }`}
-              >
-                {v}
-              </button>
-            ))}
-          </div>
-        </Field>
-
-        {/* Pets OK */}
-        <Field label="Pets OK?">
-          <TriToggle
-            value={form.pets_ok}
-            onChange={(v) => setForm({ ...form, pets_ok: v })}
-            labels={["No preference", "Yes", "No"]}
-          />
-        </Field>
-
-        {/* Smoking OK */}
-        <Field label="Smoking OK?">
-          <TriToggle
-            value={form.smoking_ok}
-            onChange={(v) => setForm({ ...form, smoking_ok: v })}
-            labels={["No preference", "Yes", "No"]}
-          />
-        </Field>
-
-        {/* Gender preference */}
-        <Field label="Gender preference">
-          <div className="flex gap-2">
-            {GENDER_PREF_OPTIONS.map((g) => (
-              <button
-                key={g}
-                type="button"
-                onClick={() =>
-                  setForm({
-                    ...form,
-                    gender_pref: form.gender_pref === g ? "" : g,
-                  })
-                }
-                className={`rounded-full border px-3 py-1 text-sm ${
-                  form.gender_pref === g
-                    ? "border-blue-600 bg-blue-50 text-blue-700"
-                    : "border-gray-300 text-gray-700 hover:bg-gray-50"
-                }`}
-              >
-                {g === "any"
-                  ? "Any"
-                  : g === "female_only"
-                    ? "Female only"
-                    : "Male only"}
-              </button>
-            ))}
-          </div>
-        </Field>
+        <LivingPreferenceFields value={form} onChange={patchForm} />
 
         {/* Free text */}
-        <Field label="Tell us anything else (optional)">
+        <Field
+          label="Tell us anything else (optional)"
+          htmlFor="ob-about"
+          hint="AI will extract preferences from your text to fill any empty fields above."
+        >
           <textarea
+            id="ob-about"
             value={form.raw_text}
             onChange={(e) => setForm({ ...form, raw_text: e.target.value })}
             className="input min-h-[100px]"
             placeholder="e.g. I'm looking for a quiet WG near ETH, ideally under 1200 CHF, moving in September…"
           />
-          <p className="mt-1 text-xs text-gray-500">
-            AI will extract preferences from your text to fill any empty fields
-            above.
-          </p>
         </Field>
 
         {error && <p className="text-sm text-red-600">{error}</p>}
@@ -638,90 +416,12 @@ export default function OnboardingPage() {
         <button
           onClick={handlePreview}
           disabled={parsing}
-          className="w-full rounded-md bg-blue-600 px-4 py-2.5 text-sm font-medium text-white hover:bg-blue-700 disabled:opacity-50"
+          className="btn-primary w-full py-2.5"
         >
           {parsing ? "Analyzing your text…" : "Preview profile"}
         </button>
       </div>
     </main>
-  );
-}
-
-function Field({
-  label,
-  required,
-  children,
-}: {
-  label: string;
-  required?: boolean;
-  children: React.ReactNode;
-}) {
-  return (
-    <div>
-      <label className="mb-1.5 block text-sm font-medium text-gray-700">
-        {label}
-        {required && <span className="text-red-500 ml-0.5">*</span>}
-      </label>
-      {children}
-    </div>
-  );
-}
-
-function Toggle({
-  checked,
-  onChange,
-}: {
-  checked: boolean;
-  onChange: (v: boolean) => void;
-}) {
-  return (
-    <button
-      type="button"
-      onClick={() => onChange(!checked)}
-      className={`relative inline-flex h-6 w-11 items-center rounded-full transition-colors ${
-        checked ? "bg-blue-600" : "bg-gray-300"
-      }`}
-    >
-      <span
-        className={`inline-block h-4 w-4 transform rounded-full bg-white transition-transform ${
-          checked ? "translate-x-6" : "translate-x-1"
-        }`}
-      />
-    </button>
-  );
-}
-
-function TriToggle({
-  value,
-  onChange,
-  labels,
-}: {
-  value: boolean | null;
-  onChange: (v: boolean | null) => void;
-  labels: [string, string, string];
-}) {
-  const options: Array<{ val: boolean | null; label: string }> = [
-    { val: null, label: labels[0] },
-    { val: true, label: labels[1] },
-    { val: false, label: labels[2] },
-  ];
-  return (
-    <div className="flex gap-2">
-      {options.map((opt) => (
-        <button
-          key={opt.label}
-          type="button"
-          onClick={() => onChange(opt.val)}
-          className={`rounded-full border px-3 py-1 text-sm ${
-            value === opt.val
-              ? "border-blue-600 bg-blue-50 text-blue-700"
-              : "border-gray-300 text-gray-700 hover:bg-gray-50"
-          }`}
-        >
-          {opt.label}
-        </button>
-      ))}
-    </div>
   );
 }
 

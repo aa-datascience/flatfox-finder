@@ -47,8 +47,9 @@ export async function PUT(request: Request) {
     update: data,
   });
 
-  // Re-score all listings against updated preferences
-  await prisma.match.deleteMany({ where: { userId } });
+  // Re-score listings against the updated preferences. This reconciles
+  // incrementally — it refreshes scores and adds/removes matches without
+  // wiping contacted history, dismissals, or saved message drafts.
   await runMatchingForUser(userId);
 
   if (body.name || body.locale) {

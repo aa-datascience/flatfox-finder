@@ -409,6 +409,27 @@ function computeMatch(
 // Suppress unused-import warning for L1_BASE_WEIGHT (kept for documentation).
 void L1_BASE_WEIGHT;
 
+// Statuses that represent real user investment in a match. When a re-score
+// means a listing no longer qualifies, matches in these states (or matches
+// that already have a drafted/sent message) are preserved rather than deleted,
+// so the user never loses contacted listings, saved drafts, or the fact that
+// they deliberately dismissed something.
+const PRESERVED_STATUSES = new Set(["contacted", "dismissed"]);
+
+/**
+ * Re-score every active listing against the user's current profile and
+ * reconcile the result with their existing matches **incrementally**:
+ *
+ *  - listing still qualifies + match exists → update score/rationale, keep
+ *    the match's status and messages untouched;
+ *  - listing newly qualifies → insert a fresh "new" match;
+ *  - listing no longer qualifies → delete the match only if the user hasn't
+ *    invested in it (not contacted/dismissed and no messages).
+ *
+ * This intentionally never wipes the whole match set, so saving the profile
+ * (even just a name or message-language change) can't destroy contacted
+ * history, dismissals, or saved drafts.
+ */
 export async function runMatchingForUser(userId: string): Promise<number> {
   const profile = await prisma.userProfile.findUnique({
     where: { userId },
@@ -460,12 +481,38 @@ export async function runMatchingForUser(userId: string): Promise<number> {
     },
   });
 
-  const matchData: Prisma.MatchCreateManyInput[] = [];
-
+  // Score every listing; keep only the ones that qualify, keyed by listing id.
+  const resultByListing = new Map<number, NonNullable<ReturnType<typeof computeMatch>>>();
   for (const listing of listings) {
     const result = computeMatch(p, listing);
-    if (result) {
-      matchData.push({
+    if (result) resultByListing.set(listing.id, result);
+  }
+
+  // What the user already has, plus whether they've messaged each match.
+  const existing = await prisma.match.findMany({
+    where: { userId },
+    select: {
+      id: true,
+      listingId: true,
+      status: true,
+      score: true,
+      _count: { select: { messages: true } },
+    },
+  });
+  const existingByListing = new Map<number, (typeof existing)[number]>();
+  for (const m of existing) {
+    if (m.listingId != null) existingByListing.set(m.listingId, m);
+  }
+
+  const creates: Prisma.MatchCreateManyInput[] = [];
+  const updates: Prisma.PrismaPromise<unknown>[] = [];
+
+  for (const listing of listings) {
+    const result = resultByListing.get(listing.id);
+    if (!result) continue;
+    const ex = existingByListing.get(listing.id);
+    if (!ex) {
+      creates.push({
         userId,
         listingId: listing.id,
         score: result.score,
@@ -474,15 +521,42 @@ export async function runMatchingForUser(userId: string): Promise<number> {
         status: "new",
         listingSnapshot: result.listingSnapshot,
       });
+    } else if (ex.score !== result.score) {
+      // Same listing, new score: refresh the scoring fields but leave the
+      // user-owned status and any messages exactly as they are.
+      updates.push(
+        prisma.match.update({
+          where: { id: ex.id },
+          data: {
+            score: result.score,
+            scoreBreakdown: result.scoreBreakdown,
+            rationale: result.rationale,
+            listingSnapshot: result.listingSnapshot,
+          },
+        })
+      );
     }
   }
 
-  if (matchData.length > 0) {
-    await prisma.match.createMany({
-      data: matchData,
-      skipDuplicates: true,
-    });
+  // Matches that no longer qualify: drop only the ones the user hasn't acted on.
+  const deletes: string[] = [];
+  for (const m of existing) {
+    if (m.listingId == null || resultByListing.has(m.listingId)) continue;
+    const invested = PRESERVED_STATUSES.has(m.status) || m._count.messages > 0;
+    if (!invested) deletes.push(m.id);
   }
 
-  return matchData.length;
+  if (deletes.length > 0) {
+    await prisma.match.deleteMany({ where: { id: { in: deletes } } });
+  }
+  if (creates.length > 0) {
+    await prisma.match.createMany({ data: creates, skipDuplicates: true });
+  }
+  // Chunk updates so a user with many re-scored listings doesn't build one
+  // unbounded transaction.
+  for (let i = 0; i < updates.length; i += 100) {
+    await prisma.$transaction(updates.slice(i, i + 100));
+  }
+
+  return resultByListing.size;
 }

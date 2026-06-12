@@ -14,7 +14,7 @@
     "@anthropic-ai/sdk": "^0.39.0",
     "@prisma/client": "^6.9.0",
     "@vitalets/google-translate-api": "^9.2.1",
-    "bcrypt": "^5.1.1",
+    "bcryptjs": "^3.0.3",
     "franc": "^6.2.0",
     "next": "^14.2.29",
     "next-auth": "^4.24.11",
@@ -22,10 +22,11 @@
     "react-dom": "^18.3.1"
   },
   "devDependencies": {
-    "@types/bcrypt": "^5.0.2",
+    "@types/bcryptjs": "^2.4.6",
     "@types/node": "^22.15.0",
     "@types/react": "^18.3.20",
     "@types/react-dom": "^18.3.6",
+    "audit-ci": "^7.1.0",
     "autoprefixer": "^10.4.21",
     "eslint": "^8.57.1",
     "eslint-config-next": "^14.2.29",

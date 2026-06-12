@@ -22,7 +22,9 @@ jobs:
           cache-dependency-path: app/package-lock.json
       - run: npm ci
       - run: npx tsc --noEmit
-      - run: npm audit --audit-level=high
+      # Gate on high/critical advisories, skipping dev-only ones and the known
+      # Next.js advisories (see app/audit-ci.jsonc for the tracked allowlist).
+      - run: npx audit-ci --config ./audit-ci.jsonc
 
   worker:
     name: Worker (pytest + audit)

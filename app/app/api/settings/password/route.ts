@@ -1,4 +1,4 @@
-import { compare, hash } from "bcrypt";
+import { compare, hash } from "bcryptjs";
 import { NextResponse } from "next/server";
 
 import { getSessionUserId, unauthorized } from "@/lib/auth";
